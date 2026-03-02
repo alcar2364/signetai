@@ -121,9 +121,12 @@ bun run deploy   # Deploy to Cloudflare (wrangler)
 | `@signet/connector-claude-code` | Claude Code connector: hooks, CLAUDE.md generation | node |
 | `@signet/connector-opencode` | OpenCode connector: plugin, AGENTS.md sync | node |
 | `@signet/connector-openclaw` | OpenClaw connector: config patching, hook handlers | node |
+| `@signet/opencode-plugin` | OpenCode runtime plugin: memory tools and session hooks | node |
 | `@signetai/signet-memory-openclaw` | OpenClaw runtime plugin for calling Signet daemon | node |
+| `@signet/tray` | System tray application | node |
 | `signetai` | Meta-package bundling CLI + daemon | - |
 | `@signet/web` | Marketing website (Astro static, Cloudflare Pages) | cloudflare |
+| `predictor` | Predictive memory scorer sidecar (WIP) | rust |
 
 ### Package Responsibilities
 
@@ -301,6 +304,12 @@ All user data lives at `~/.agents/`:
 - `packages/daemon/src/update-system.ts` - Update checker singleton
 - `packages/daemon/src/content-normalization.ts` - Content normalization
 - `packages/daemon/src/scheduler/` - Scheduled task worker (cron, spawn, polling)
+- `packages/daemon/src/embedding-tracker.ts` - Incremental embedding refresh tracker
+- `packages/daemon/src/embedding-health.ts` - Embedding health metrics
+- `packages/daemon/src/session-checkpoints.ts` - Session checkpoint persistence
+- `packages/daemon/src/continuity-state.ts` - Continuity state for compaction boundaries
+- `packages/daemon/src/telemetry.ts` - Telemetry event collection
+- `packages/daemon/src/feature-flags.ts` - Runtime feature flags
 - `packages/sdk/src/index.ts` - SDK client
 - `packages/connector-claude-code/src/index.ts` - Claude Code connector
 - `packages/connector-opencode/src/index.ts` - OpenCode connector
@@ -384,16 +393,25 @@ bun src/cli.ts status    # Check status
 |----------|--------|-------------|
 | `/health` | GET | Health check |
 | `/api/status` | GET | Full daemon status |
+| `/api/features` | GET | Feature flags |
 | `/api/config` | GET/POST | Config files CRUD |
+| `/api/identity` | GET | Identity file read |
 | `/api/memories` | GET | List memories |
 | `/api/memory/remember` | POST | Save a memory |
+| `/api/memory/save` | POST | Save memory (alias) |
 | `/api/memory/recall` | POST | Hybrid search |
+| `/api/memory/forget` | POST | Batch forget memories |
+| `/api/memory/modify` | POST | Modify a memory |
+| `/api/memory/search` | GET | Search memories |
+| `/api/memory/:id` | GET/PATCH/DELETE | Get, update, or delete a memory |
+| `/api/memory/:id/history` | GET | Memory version history |
+| `/api/memory/:id/recover` | POST | Recover a deleted memory |
 | `/memory/search` | GET | Legacy keyword search |
+| `/memory/similar` | GET | Vector similarity search |
 | `/api/embeddings` | GET | Export embeddings |
 | `/api/embeddings/status` | GET | Embedding processing status |
+| `/api/embeddings/health` | GET | Embedding health metrics |
 | `/api/embeddings/projection` | GET | UMAP 2D/3D projection (server-side) |
-| `/api/memory/:id/history` | GET | Memory version history |
-| `/api/memory/:id` | PATCH | Update a memory |
 | `/api/skills` | GET | List installed skills |
 | `/api/skills/browse` | GET | Browse available skills |
 | `/api/skills/search` | GET | Search skills |
@@ -403,26 +421,70 @@ bun src/cli.ts status    # Check status
 | `/api/secrets/:name` | POST/DELETE | Store or delete a secret |
 | `/api/secrets/exec` | POST | Execute command with multiple secrets as env vars |
 | `/api/secrets/:name/exec` | POST | Execute command with single secret (legacy) |
-| `/api/hooks/*` | POST/GET | Session + synthesis hooks |
+| `/api/hooks/session-start` | POST | Inject context into session |
+| `/api/hooks/user-prompt-submit` | POST | Per-prompt context load |
+| `/api/hooks/session-end` | POST | Extract session memories |
+| `/api/hooks/remember` | POST | Save a memory via hook |
+| `/api/hooks/recall` | POST | Search via hook |
+| `/api/hooks/pre-compaction` | POST | Pre-compaction summary instructions |
+| `/api/hooks/compaction-complete` | POST | Save compaction summary |
+| `/api/hooks/synthesis/config` | GET | Synthesis configuration |
+| `/api/hooks/synthesis` | POST | Request MEMORY.md synthesis |
+| `/api/hooks/synthesis/complete` | POST | Save synthesized MEMORY.md |
+| `/api/hook/remember` | POST | Save memory via hook (alias) |
 | `/api/harnesses` | GET | List harnesses |
-| `/api/auth/*` | POST/GET | Auth token management |
-| `/api/documents/*` | GET/POST/DELETE | Document ingest and retrieval |
-| `/api/connectors/*` | GET/POST | Connector status and management |
-| `/api/diagnostics/*` | GET | Health scoring and system diagnostics |
-| `/api/repair/*` | POST | Repair actions for broken state |
-| `/api/analytics/*` | GET | Usage analytics and metrics |
+| `/api/harnesses/regenerate` | POST | Regenerate harness configs |
+| `/api/auth/whoami` | GET | Current auth identity |
+| `/api/auth/token` | POST | Issue auth token |
+| `/api/documents` | GET/POST | List or enqueue documents |
+| `/api/documents/:id` | GET/DELETE | Get or delete a document |
+| `/api/documents/:id/chunks` | GET | Get document chunks |
+| `/api/connectors` | GET/POST | List or register connectors |
+| `/api/connectors/:id` | GET/DELETE | Get or delete a connector |
+| `/api/connectors/:id/sync` | POST | Trigger incremental sync |
+| `/api/connectors/:id/sync/full` | POST | Trigger full re-sync |
+| `/api/connectors/:id/health` | GET | Connector health |
+| `/api/diagnostics` | GET | Full health report |
+| `/api/diagnostics/:domain` | GET | Per-domain health score |
+| `/api/pipeline/status` | GET | Pipeline status snapshot |
+| `/api/repair/requeue-dead` | POST | Requeue dead-letter jobs |
+| `/api/repair/release-leases` | POST | Release stale job leases |
+| `/api/repair/check-fts` | POST | Check/repair FTS consistency |
+| `/api/repair/retention-sweep` | POST | Trigger retention sweep |
+| `/api/repair/embedding-gaps` | GET | Count unembedded memories |
+| `/api/repair/re-embed` | POST | Batch re-embed missing vectors |
+| `/api/repair/clean-orphans` | POST | Remove orphaned embeddings |
+| `/api/repair/dedup-stats` | GET | Deduplication statistics |
+| `/api/repair/deduplicate` | POST | Deduplicate memories |
+| `/api/checkpoints` | GET | List session checkpoints |
+| `/api/checkpoints/:sessionKey` | GET | Checkpoints for a session |
+| `/api/analytics/usage` | GET | Usage counters |
+| `/api/analytics/errors` | GET | Recent error events |
+| `/api/analytics/latency` | GET | Latency histograms |
+| `/api/analytics/logs` | GET | Structured log entries |
+| `/api/analytics/memory-safety` | GET | Mutation diagnostics |
 | `/api/analytics/continuity` | GET | Session continuity scores over time |
 | `/api/analytics/continuity/latest` | GET | Latest continuity score per project |
-| `/api/timeline/*` | GET | Event timeline |
-| `/api/git/*` | GET/POST | Git sync status and operations |
-| `/api/update/*` | GET/POST | Update check and apply |
+| `/api/telemetry/events` | GET | Query telemetry events |
+| `/api/telemetry/stats` | GET | Aggregated telemetry statistics |
+| `/api/telemetry/export` | GET | Export telemetry as NDJSON |
+| `/api/timeline/:id` | GET | Entity event timeline |
+| `/api/timeline/:id/export` | GET | Export timeline with metadata |
+| `/api/git/status` | GET | Git sync status |
+| `/api/git/pull` | POST | Pull from remote |
+| `/api/git/push` | POST | Push to remote |
+| `/api/git/sync` | POST | Pull then push |
+| `/api/git/config` | GET/POST | Git sync configuration |
+| `/api/update/check` | GET | Check for updates |
+| `/api/update/config` | GET/POST | Update configuration |
+| `/api/update/run` | POST | Apply pending update |
 | `/api/tasks` | GET/POST | List/create scheduled tasks |
 | `/api/tasks/:id` | GET/PATCH/DELETE | Get/update/delete task |
 | `/api/tasks/:id/run` | POST | Trigger immediate run |
 | `/api/tasks/:id/runs` | GET | Paginated run history |
-| `/api/logs/*` | GET | Daemon log access |
+| `/api/tasks/:id/stream` | GET | SSE stream of task output |
+| `/api/logs` | GET | Daemon log access |
 | `/api/logs/stream` | GET | SSE log streaming |
-| `/api/identity` | GET/POST | Identity file read/write |
 | `/mcp` | ALL | MCP server (Streamable HTTP, memory + secret tools) |
 
 
