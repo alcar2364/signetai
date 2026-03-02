@@ -2,6 +2,13 @@
 
 All notable changes to Signet are documented here.
 
+## [0.20.2] - 2026-03-02
+
+### Features
+
+- **marketplace**: add curated storefront and MCP server workflows
+
+
 ## [0.20.1] - 2026-03-02
 
 ### Refactoring
