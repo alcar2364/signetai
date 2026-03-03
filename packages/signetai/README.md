@@ -7,14 +7,11 @@ Signet gives your AI agents persistent memory and identity that follows them acr
 ## Install
 
 ```bash
-# npm
-npm install -g signetai
-
 # bun (recommended)
 bun add -g signetai
 
-# or run directly
-npx signetai
+# npm
+npm install -g signetai
 ```
 
 ## Quick Start
