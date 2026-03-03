@@ -2,6 +2,13 @@
 
 All notable changes to Signet are documented here.
 
+## [0.33.0] - 2026-03-03
+
+### Bug Fixes
+
+- **embeddings**: harden repair flows and surface live progress
+
+
 ## [0.32.0] - 2026-03-03
 
 ### Features
