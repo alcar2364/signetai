@@ -33,7 +33,8 @@ export type LogCategory =
 	| "embedding-tracker" // Incremental embedding refresh tracker
 	| "summary-worker" // Session summary worker
 	| "session-memories" // Session memory tracking
-	| "system"; // System events
+	| "system" // System events
+	| "update"; // Auto-update cycle
 
 export interface LogEntry {
 	timestamp: string;

@@ -36,6 +36,7 @@
 	};
 
 	let editorContent = $state("");
+	let prevSelectedFile = $state("");
 	let saving = $state(false);
 	let lastSavedAt = $state<string | null>(null);
 	let saveFeedback = $state("");
@@ -73,9 +74,12 @@
 		}
 	});
 
-	// Load content when file changes
+	// Load content only when switching to a different file
 	$effect(() => {
-		editorContent = activeFile?.content ?? "";
+		if (selectedFile !== prevSelectedFile) {
+			prevSelectedFile = selectedFile;
+			editorContent = activeFile?.content ?? "";
+		}
 	});
 
 	// Track dirty state globally

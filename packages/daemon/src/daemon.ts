@@ -7175,7 +7175,35 @@ async function main() {
 
 	// Start git sync timer (if enabled and has token)
 	startGitSyncTimer();
-	initUpdateSystem(CURRENT_VERSION, AGENTS_DIR);
+	initUpdateSystem(CURRENT_VERSION, AGENTS_DIR, () => {
+		// Self-restart: spawn a replacement daemon process before exiting.
+		// This mirrors the spawn pattern used by `signet daemon start` in the CLI.
+		const daemonScript = process.argv[1] ?? "";
+		if (!daemonScript) {
+			logger.warn("daemon", "Cannot self-restart: process.argv[1] is empty, falling back to clean exit");
+			setTimeout(() => { process.exit(0); }, 500);
+			return;
+		}
+
+		logger.info("daemon", "Spawning replacement daemon process", {
+			execPath: process.execPath,
+			script: daemonScript,
+		});
+
+		const replacement = spawn(process.execPath, [daemonScript], {
+			detached: true,
+			stdio: "ignore",
+			env: {
+				...process.env,
+				SIGNET_PORT: String(PORT),
+				SIGNET_PATH: AGENTS_DIR,
+			},
+		});
+		replacement.unref();
+
+		logger.info("daemon", "Replacement daemon spawned, exiting current process");
+		setTimeout(() => { process.exit(0); }, 500);
+	});
 	initFeatureFlags(AGENTS_DIR);
 	startUpdateTimer();
 

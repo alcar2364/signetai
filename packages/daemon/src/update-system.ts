@@ -99,6 +99,7 @@ let updateConfig: UpdateConfig = {
 	checkInterval: DEFAULT_UPDATE_INTERVAL_SECONDS,
 	channel: "latest" as const,
 };
+let restartCallback: (() => void) | null = null;
 
 // ---------------------------------------------------------------------------
 // Init / accessors
@@ -107,10 +108,12 @@ let updateConfig: UpdateConfig = {
 export function initUpdateSystem(
 	version: string,
 	dir: string,
+	onRestartNeeded?: () => void,
 ): void {
 	currentVersion = version;
 	agentsDir = dir;
 	updateConfig = loadUpdateConfig();
+	restartCallback = onRestartNeeded ?? null;
 	initialized = true;
 }
 
@@ -180,7 +183,10 @@ export function getUpdateSummary(): string | null {
 	if (pendingRestartVersion) {
 		return (
 			`Signet v${pendingRestartVersion} is installed but needs ` +
-			"a daemon restart. Run `signet daemon restart`."
+			"a daemon restart. Run:\n" +
+			"  signet daemon restart\n" +
+			"  signet sync\n\n" +
+			"These are the ONLY supported post-update commands."
 		);
 	}
 
@@ -197,19 +203,43 @@ export function getUpdateSummary(): string | null {
 		const notes = lastUpdateCheck.releaseNotes
 			? `\n\nWhat's new:\n${lastUpdateCheck.releaseNotes}`
 			: "";
+
 		if (updateConfig.autoInstall) {
+			const autoInfo = lastAutoUpdateAt
+				? ` Last auto-update: ${lastAutoUpdateAt.toISOString()}.`
+				: "";
 			return (
 				`Signet v${latest} is available (current: v${currentVersion}). ` +
 				"Auto-update will install it on the next check cycle." +
+				autoInfo +
 				notes
 			);
 		}
+
+		const packageManager = resolvePrimaryPackageManager({
+			agentsDir,
+			env: process.env,
+		});
+		const installCmd = getGlobalInstallCommand(
+			packageManager.family,
+			NPM_PACKAGE,
+		);
+		const fullInstallCmd = `${installCmd.command} ${installCmd.args.join(" ")}`;
+
 		return (
-			`Signet v${latest} is available (current: v${currentVersion}). ` +
-			"Run `signet update install` to update, or " +
-			"`signet update enable` for automatic updates." +
+			`Signet v${latest} is available (current: v${currentVersion}).\n\n` +
+			"To update Signet:\n" +
+			`  ${fullInstallCmd}\n` +
+			"  signet daemon restart\n" +
+			"  signet sync\n\n" +
+			"These are the ONLY supported update commands. " +
+			"Do not use npx, bunx, or signet update install." +
 			notes
 		);
+	}
+
+	if (lastAutoUpdateAt && updateConfig.autoInstall) {
+		return `Signet is up to date (v${currentVersion}). Last auto-update: ${lastAutoUpdateAt.toISOString()}.`;
 	}
 
 	return null;
@@ -513,6 +543,10 @@ export async function runUpdate(
 			});
 
 			proc.on("close", (code) => {
+				logger.info("update", "Update command exited", {
+					exitCode: code ?? -1,
+					command: `${installCommand.command} ${installCommand.args.join(" ")}`,
+				});
 				if (code === 0) {
 					pendingRestartVersion = targetVersion ?? "unknown";
 					lastUpdateCheck = null;
@@ -558,30 +592,46 @@ async function runAutoUpdateCycle(): Promise<void> {
 	}
 
 	if (updateCheckInProgress || updateInstallInProgress) {
+		logger.info("update", "Auto-update cycle skipped — check or install already in progress");
 		return;
 	}
 
 	updateCheckInProgress = true;
+	logger.info("update", "Auto-update cycle started");
 
 	try {
 		const checkResult = await checkForUpdates();
+
 		if (checkResult.checkError) {
 			lastAutoUpdateError = categorizeUpdateError(checkResult.checkError);
+			logger.warn("update", "Auto-update check returned error", {
+				error: checkResult.checkError,
+			});
 			return;
 		}
 
+		logger.info("update", "Update check complete", {
+			current: currentVersion,
+			latest: checkResult.latestVersion ?? "unknown",
+			updateAvailable: checkResult.updateAvailable,
+		});
+
 		if (!checkResult.updateAvailable || !checkResult.latestVersion) {
+			logger.info("update", "No update available — skipping install");
 			return;
 		}
 
 		if (isMajorUpgrade(currentVersion, checkResult.latestVersion)) {
-			logger.warn("system", "Major upgrade available — manual install required");
+			logger.warn("update", "Major upgrade available — skipping auto-install (manual install required)", {
+				current: currentVersion,
+				latest: checkResult.latestVersion,
+			});
 			lastAutoUpdateError = "Major version upgrade requires manual install";
 			return;
 		}
 
 		logger.info(
-			"system",
+			"update",
 			`Auto-installing update v${checkResult.latestVersion}`,
 		);
 		const installResult = await runUpdate(checkResult.latestVersion);
@@ -590,27 +640,33 @@ async function runAutoUpdateCycle(): Promise<void> {
 			lastAutoUpdateAt = new Date();
 			lastAutoUpdateError = null;
 			logger.info(
-				"system",
-				`Auto-update installed v${checkResult.latestVersion}. Restarting daemon.`,
+				"update",
+				`Auto-update installed v${checkResult.latestVersion}. Triggering daemon restart.`,
 			);
 
-			// Clean exit — systemd/launchd Restart=always will respawn us.
-			// For non-service runs, the CLI's `signet daemon start` can
-			// detect the clean exit and re-launch if desired.
 			stopUpdateTimer();
-			setTimeout(() => {
-				process.exit(0);
-			}, 500);
+
+			if (restartCallback) {
+				logger.info("update", "Invoking restart callback to spawn replacement daemon");
+				restartCallback();
+			} else {
+				// Fallback: clean exit — systemd/launchd Restart=always will respawn.
+				// Without a restart callback, the daemon simply exits.
+				logger.warn("update", "No restart callback registered — exiting and relying on service manager to restart");
+				setTimeout(() => {
+					process.exit(0);
+				}, 500);
+			}
 			return;
 		}
 
 		lastAutoUpdateError = categorizeUpdateError(installResult.message);
-		logger.warn("system", "Auto-update failed", {
+		logger.warn("update", "Auto-update install failed", {
 			error: installResult.message,
 		});
 	} catch (e) {
 		lastAutoUpdateError = categorizeUpdateError((e as Error).message);
-		logger.warn("system", "Auto-update cycle failed", {
+		logger.warn("update", "Auto-update cycle failed", {
 			error: lastAutoUpdateError,
 		});
 	} finally {
@@ -638,8 +694,8 @@ export function startUpdateTimer(): void {
 	}
 
 	logger.info(
-		"system",
-		`Auto-update enabled: every ${updateConfig.checkInterval}s`,
+		"update",
+		`Update timer started: checking every ${updateConfig.checkInterval}s, autoInstall=${updateConfig.autoInstall}, channel=${updateConfig.channel}`,
 	);
 
 	void runAutoUpdateCycle();

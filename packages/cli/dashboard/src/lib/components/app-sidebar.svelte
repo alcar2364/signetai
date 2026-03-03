@@ -187,13 +187,20 @@ const navItems: { id: TabId; label: string; icon: typeof FileText }[] = [
 				<Sidebar.MenuItem>
 					<span
 						class="px-2 py-1 text-[10px] tracking-[0.06em]
-							text-[var(--sig-text-muted)]
 							font-[family-name:var(--font-mono)]
 							overflow-hidden whitespace-nowrap
 							transition-opacity duration-200 ease-out
-							group-data-[collapsible=icon]:opacity-0"
+							group-data-[collapsible=icon]:opacity-0
+							{daemonStatus.update?.pendingRestart
+								? 'text-[var(--sig-warning)]'
+								: 'text-[var(--sig-text-muted)]'}"
 					>
-						v{daemonStatus.version}
+						{#if daemonStatus.update?.pendingRestart}
+							v{daemonStatus.version} → v{daemonStatus.update.pendingRestart}
+							<span class="block text-[9px] opacity-70">restart needed</span>
+						{:else}
+							v{daemonStatus.version}
+						{/if}
 					</span>
 				</Sidebar.MenuItem>
 			{/if}

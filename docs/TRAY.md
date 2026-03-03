@@ -74,7 +74,7 @@ A `DaemonManager` platform trait abstracts start/stop/is_running.
 
 Start order: check for `~/.config/systemd/user/signet.service` — if
 present, use `systemctl --user start signet`. Otherwise: locate bun
-binary → locate `signet-daemon` → fall back to `bunx signetai daemon start`.
+binary → locate `signet-daemon` → fall back to the globally installed `signet daemon start`.
 
 Stop: send SIGTERM, poll at 100ms intervals up to 3 seconds, then clean
 up the PID file.

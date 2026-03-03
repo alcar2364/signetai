@@ -207,15 +207,14 @@ Install
 ---
 
 ```bash
-# one-line installer
-curl -sL https://signetai.sh/install | bash
+# bun (recommended)
+bun add -g signetai
 
-# or global install
+# npm
 npm install -g signetai
-# bun add -g signetai
 
-# or run without installing
-npx signetai setup
+# or one-line installer
+curl -sL https://signetai.sh/install | bash
 ```
 
 Setup

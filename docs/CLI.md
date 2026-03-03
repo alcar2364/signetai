@@ -16,13 +16,13 @@ Installation
 ---
 
 ```bash
-# Via npm/npx
-npx signet setup
+# bun (recommended)
+bun add -g signetai
 
-# Via bun
-bunx signet setup
+# npm
+npm install -g signetai
 
-# Via installer script
+# or installer script
 curl -sL https://signetai.sh/install | bash
 ```
 
