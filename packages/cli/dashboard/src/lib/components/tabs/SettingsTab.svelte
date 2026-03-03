@@ -4,7 +4,6 @@
 	import { setSettingsDirty } from "$lib/stores/unsaved-changes.svelte";
 	import { untrack } from "svelte";
 	import * as Popover from "$lib/components/ui/popover/index.js";
-	import * as Select from "$lib/components/ui/select/index.js";
 	import AgentSection from "./settings/AgentSection.svelte";
 	import AuthSection from "./settings/AuthSection.svelte";
 	import EmbeddingsSection from "./settings/EmbeddingsSection.svelte";
@@ -145,8 +144,8 @@
 			if (!isInputFocused && /^[1-9]$/.test(e.key)) {
 				e.preventDefault();
 				const idx = parseInt(e.key, 10) - 1;
-				if (sections[idx]) {
-					switchSection(sections[idx].id);
+				if (filteredSections[idx]) {
+					switchSection(filteredSections[idx].id);
 				}
 			}
 		}

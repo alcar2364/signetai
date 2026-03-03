@@ -131,8 +131,8 @@
 			if (!isInputFocused && /^[1-9]$/.test(e.key)) {
 				e.preventDefault();
 				const idx = parseInt(e.key, 10) - 1;
-				if (idx < mdFiles.length && mdFiles[idx]) {
-					selectFileWithGuard(mdFiles[idx].name);
+				if (idx < filteredFiles.length && filteredFiles[idx]) {
+					selectFileWithGuard(filteredFiles[idx].name);
 				}
 			}
 		}
