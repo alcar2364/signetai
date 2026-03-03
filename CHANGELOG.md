@@ -2,6 +2,13 @@
 
 All notable changes to Signet are documented here.
 
+## [0.35.2] - 2026-03-03
+
+### Bug Fixes
+
+- resolve skills marketplace tab crash from duplicate each-block keys
+
+
 ## [0.35.1] - 2026-03-03
 
 ### Docs
