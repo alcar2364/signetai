@@ -26,7 +26,7 @@ jobs:
         id: changes
         run: |
           CODE_CHANGES=$(git diff --name-only HEAD~1 HEAD -- \
-            'packages/**' 'scripts/**' 'web/**' \
+            'packages/**' 'scripts/**' \
             'package.json' 'bunfig.toml' 'tsconfig*.json' \
             '.github/workflows/**' \
             | grep -v '\.md$' \
