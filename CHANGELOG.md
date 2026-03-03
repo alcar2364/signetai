@@ -2,6 +2,18 @@
 
 All notable changes to Signet are documented here.
 
+## [0.32.0] - 2026-03-03
+
+### Features
+
+- **daemon**: add built-in native embedding provider via transformers.js
+
+### Bug Fixes
+
+- **specs**: resolve package.json merge conflict cleanly
+- **daemon**: reset modelCached flag on native provider shutdown
+
+
 ## [0.31.3] - 2026-03-03
 
 ### Features
