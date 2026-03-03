@@ -8,7 +8,8 @@ section: "Getting Started"
 Configuration Reference
 =======================
 
-Complete reference for all Signet configuration options.
+Complete reference for all Signet configuration options. For initial setup,
+see [[quickstart]]. For the [[daemon]] runtime, see [[architecture]].
 
 
 Configuration Files
@@ -226,7 +227,7 @@ process reads all memories and asks a model to write a coherent summary.
 Pipeline V2 Config
 ------------------
 
-The V2 memory pipeline lives at `packages/daemon/src/pipeline/`. It runs
+The V2 [[pipeline|memory pipeline]] lives at `packages/daemon/src/pipeline/`. It runs
 LLM-based fact extraction against incoming conversation text, then decides
 whether to write new memories, update existing ones, or skip. Config lives
 under `memory.pipelineV2` in `agent.yaml`.
@@ -527,8 +528,8 @@ until their tombstone window expires.
 Hooks Config
 ------------
 
-Controls what Signet injects during harness lifecycle events. See
-[HOOKS.md](./HOOKS.md) for full details.
+Controls what Signet injects during [[harnesses|harness]] lifecycle events.
+See [[hooks]] for full details.
 
 ```yaml
 hooks:

@@ -9,8 +9,8 @@ Tray App
 =========
 
 The Signet tray app is a lightweight desktop companion that sits in your
-system tray and shows the daemon's current state. It provides quick
-controls — start, stop, restart, open dashboard — without requiring a
+system tray and shows the [[daemon]]'s current state. It provides quick
+controls — start, stop, restart, open [[dashboard]] — without requiring a
 terminal or browser.
 
 Source: `packages/tray/`

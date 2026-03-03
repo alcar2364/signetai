@@ -7,13 +7,13 @@ section: "Core Concepts"
 
 # Hooks System
 
-Signet's hook system lets harnesses integrate with session lifecycle events — injecting memory at session start, capturing summaries at compaction, and triggering MEMORY.md synthesis.
+Signet's hook system lets [[harnesses]] integrate with session lifecycle events — injecting [[memory]] at session start, capturing summaries at compaction, and triggering MEMORY.md synthesis.
 
 ---
 
 ## Overview
 
-Hooks are HTTP endpoints exposed by the Signet daemon. Harnesses call them at specific lifecycle points:
+Hooks are HTTP endpoints exposed by the Signet [[daemon]]. Harnesses call them at specific lifecycle points:
 
 | Hook | When | Purpose |
 |------|------|---------|
@@ -70,7 +70,7 @@ The `inject` field is ready-to-use text for prepending to the system prompt. It 
 
 ### Configuration
 
-In `agent.yaml`:
+In `agent.yaml` (see [[configuration]]):
 
 ```yaml
 hooks:

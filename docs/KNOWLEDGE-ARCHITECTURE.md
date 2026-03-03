@@ -8,7 +8,7 @@ section: "Core Concepts"
 Knowledge Architecture
 ======================
 
-The difference between a memory system and an intelligent one is structure.
+The difference between a [[memory]] system and an intelligent one is structure.
 Any system can store facts. The question is whether those facts are
 organized in a way that makes them *useful* — findable at the right moment,
 connected to the right things, and trimmed of everything that doesn't
@@ -33,7 +33,7 @@ A session produces hundreds of observations. A document produces thousands
 of sentences. The agent encounters facts in passing, half-formed, buried in
 context. None of it is immediately useful in the form it arrives.
 
-The extraction pipeline is the refinery. Over time, continuously and in the
+The extraction [[pipeline]] is the refinery. Over time, continuously and in the
 background, it takes raw material and distills it:
 
 ```
@@ -202,9 +202,9 @@ entity. The user never manages it, configures it, or even sees it
 directly. It's just behavior: the agent is more cautious around
 unfamiliar entities, more decisive around well-mapped ones.
 
-In the constellation view, this manifests as node brightness. Entities
-with dense constraint graphs are luminous. New entities are dim. The
-visual tells you, at a glance, where the agent is operating on solid
+In the [[dashboard|constellation view]], this manifests as node brightness.
+Entities with dense constraint graphs are luminous. New entities are dim.
+The visual tells you, at a glance, where the agent is operating on solid
 ground.
 
 

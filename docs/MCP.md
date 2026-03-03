@@ -8,9 +8,9 @@ section: "Reference"
 MCP Server
 ==========
 
-The Signet daemon exposes an MCP (Model Context Protocol) server that gives
-AI harnesses native tool access to memory operations. Instead of relying on
-shell commands or skill invocations, harnesses call Signet tools directly
+The Signet [[daemon]] exposes an MCP (Model Context Protocol) server that gives
+AI [[harnesses]] native tool access to [[memory]] operations. Instead of relying
+on shell commands or skill invocations, harnesses call Signet tools directly
 through MCP's standardized interface.
 
 
@@ -19,7 +19,7 @@ Overview
 
 MCP complements Signet's existing hook-based integration:
 
-- **Hooks** handle lifecycle events (session start/end, prompt submission,
+- **[[hooks|Hooks]]** handle lifecycle events (session start/end, prompt submission,
   compaction). They run automatically.
 - **MCP tools** provide on-demand operations (search, store, modify, forget).
   The agent invokes them when needed.

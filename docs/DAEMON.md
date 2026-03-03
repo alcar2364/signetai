@@ -8,11 +8,12 @@ section: "Reference"
 Signet Daemon
 =============
 
-The Signet daemon is a background service that provides the HTTP API,
-serves the dashboard, watches config files for changes, manages harness
-synchronization, and exposes an MCP server for native tool access. It also
-runs the memory pipeline and a suite of subsystem workers for ingestion,
-retention, maintenance, analytics, and diagnostics.
+The Signet daemon is a background service that provides the [[api|HTTP API]],
+serves the [[dashboard]], watches config files for changes, manages
+[[harnesses|harness]] synchronization, and exposes an [[mcp|MCP server]] for
+native tool access. It also runs the [[pipeline|memory pipeline]] and a
+suite of subsystem workers for ingestion, retention, maintenance,
+[[analytics]], and [[diagnostics]].
 
 The daemon runs on `http://localhost:3850` by default.
 

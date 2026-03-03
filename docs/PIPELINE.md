@@ -11,7 +11,7 @@ Memory Pipeline v2
 Overview and Philosophy
 ---
 
-Pipeline v2 exists because the original memory system was purely reactive:
+Pipeline v2 exists because the original [[memory]] system was purely reactive:
 callers wrote whatever they wanted, the database accepted it, and recall
 quality depended entirely on how well the caller chose what to store. That
 model worked for bootstrapping but doesn't scale — memories accumulate
@@ -28,7 +28,7 @@ derived facts are layered on top rather than replacing the original.
 
 The central constraint governing every design decision here is: **no LLM
 calls inside write-locked transactions.** SQLite write locks are exclusive,
-and a blocking HTTP call to Ollama inside one would stall the entire daemon.
+and a blocking HTTP call to Ollama inside one would stall the entire [[daemon]].
 The pipeline enforces a strict two-phase discipline: fetch and embed outside
 the lock, then commit atomically inside `withWriteTx`. Any violation of this
 rule introduces unbounded latency into every other writer.
@@ -662,9 +662,9 @@ without `session_memories` data still get a valid score row.
 Configuration Reference
 ---
 
-All pipeline config lives under `memory.pipelineV2` in `agent.yaml` (or
-`AGENT.yaml` / `config.yaml`). The config uses a nested structure with
-grouped sub-objects. Legacy flat keys are also supported for backward
+All pipeline config lives under `memory.pipelineV2` in `agent.yaml` (see
+[[configuration]]). The config uses a nested structure with grouped
+sub-objects. Legacy flat keys are also supported for backward
 compatibility (nested keys take precedence).
 
 ### Top-level flags

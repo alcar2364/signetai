@@ -27,7 +27,7 @@ A skill is a directory inside `~/.agents/skills/` containing at minimum a `SKILL
     └── SKILL.md          # GitHub CLI operations
 ```
 
-When a harness loads your agent, the installed skills are included in the system prompt (via the `<available_skills>` section in AGENTS.md). The agent reads the relevant SKILL.md and follows its instructions.
+When a [[harnesses|harness]] loads your agent, the installed skills are included in the system prompt (via the `<available_skills>` section in AGENTS.md). The agent reads the relevant SKILL.md and follows its instructions.
 
 ---
 
@@ -63,7 +63,7 @@ signet skill create my-tool
 
 ## Built-in Skills
 
-Signet ships with three built-in skills that integrate directly with the memory system:
+Signet ships with three built-in skills that integrate directly with the [[memory]] system (see [[memory-skills]] for full details):
 
 ### `/remember`
 
@@ -186,7 +186,7 @@ The `user_invocable: true` flag means users can trigger the skill with `/skill-n
 
 ## Dashboard
 
-The dashboard's **Skills** panel provides a UI for everything the CLI does:
+The [[dashboard]]'s **Skills** panel provides a UI for everything the CLI does:
 
 - **Installed tab** — lists skills with name, description, version
 - **Browse tab** — search skills.sh, install with one click

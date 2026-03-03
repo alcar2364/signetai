@@ -7,8 +7,8 @@ section: "Features"
 
 # Scheduled Tasks
 
-Schedule recurring agent prompts that the Signet daemon executes
-automatically via Claude Code or OpenCode CLI.
+Schedule recurring agent prompts that the Signet [[daemon]] executes
+automatically via Claude Code or OpenCode [[cli|CLI]].
 
 ## Overview
 
@@ -23,7 +23,7 @@ Source code: `packages/daemon/src/scheduler/`
 
 ### Via Dashboard
 
-1. Open the Signet dashboard (http://localhost:3850)
+1. Open the Signet [[dashboard]] (http://localhost:3850)
 2. Navigate to the **Tasks** tab
 3. Click **+ New Task**
 4. Fill in the form:

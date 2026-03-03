@@ -24,10 +24,10 @@ section: "Project"
 
 **Own your agent. Bring it anywhere.**
 
-Signet is a local-first identity, memory, and operations layer for AI
-agents. It ships a full memory pipeline with LLM-based extraction and
-graph-augmented retrieval, an authenticated HTTP API, analytics, and
-an integration SDK — all running on your machine, under your control.
+Signet is a local-first identity, [[memory]], and operations layer for AI
+agents. It ships a full [[pipeline|memory pipeline]] with LLM-based extraction and
+graph-augmented retrieval, an authenticated [[api|HTTP API]], [[analytics]], and
+an integration [[sdk|SDK]] — all running on your machine, under your control.
 
 Agent configuration lives in plain files at `~/.agents/`, backed by a
 SQLite database, and synced across every harness you use. Signet is

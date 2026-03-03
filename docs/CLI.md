@@ -8,7 +8,8 @@ section: "Reference"
 Signet CLI Reference
 ====================
 
-Complete reference for all Signet CLI commands.
+Complete reference for all Signet CLI commands. For the [[daemon]]
+HTTP API, see [[api]]. For initial setup walkthrough, see [[quickstart]].
 
 ---
 
@@ -501,7 +502,7 @@ signet sync
 `signet secret`
 ---
 
-Manage encrypted secrets stored via the daemon, including 1Password
+Manage encrypted [[secrets]] stored via the daemon, including 1Password
 service-account integration.
 
 ```bash
@@ -541,8 +542,8 @@ a remote repository.
 `signet skill`
 ---
 
-Manage agent skills from the GitHub-based registry. Skills are installed
-to `~/.agents/skills/` and symlinked into harness config directories.
+Manage agent [[skills]] from the GitHub-based registry. Skills are installed
+to `~/.agents/skills/` and symlinked into [[harnesses|harness]] config directories.
 
 ```bash
 signet skill list

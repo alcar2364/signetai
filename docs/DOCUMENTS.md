@@ -9,14 +9,14 @@ Document Ingest
 ===============
 
 The document ingest subsystem lets you push arbitrary text content or URLs
-into Signet's memory store. Documents are split into overlapping chunks,
+into Signet's [[memory]] store. Documents are split into overlapping chunks,
 each chunk is embedded and written as a `document_chunk` memory, and the
 whole set is linked back to the originating document record. Once indexed,
 chunks participate in hybrid search alongside any other memory type.
 
 This doc covers the ingest API, processing lifecycle, chunking mechanics,
-and worker configuration. For full endpoint signatures and auth details,
-see `docs/API.md`.
+and worker [[configuration]]. For full endpoint signatures and auth details,
+see [[api]].
 
 
 Source Types
@@ -221,7 +221,7 @@ filter hybrid search results by source document.
 Worker Model
 ------------
 
-`startDocumentWorker()` runs a polling loop inside the daemon process. It
+`startDocumentWorker()` runs a polling loop inside the [[daemon]] process. It
 shares the same lease-based job table (`memory_jobs`) used by the
 extraction worker. The job type is `document_ingest`.
 

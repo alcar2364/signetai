@@ -53,6 +53,7 @@ coverage/
 
 # Local references
 references/
+dogfood-output/
 
 # Web (Cloudflare Worker)
 web/.wrangler/
@@ -60,3 +61,4 @@ web/.dev.vars*
 
 # Rust sidecar build artifacts
 packages/predictor/target/
+

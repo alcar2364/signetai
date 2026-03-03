@@ -8,9 +8,9 @@ section: "Reference"
 Signet Daemon HTTP API
 ======================
 
-The Signet daemon exposes a REST API on `http://localhost:3850` by default.
+The Signet [[daemon]] exposes a REST API on `http://localhost:3850` by default.
 All requests and responses use JSON unless otherwise noted. The base URL and
-port are configurable via environment variables.
+port are configurable via environment variables (see [[configuration]]).
 
 ```
 Base URL: http://localhost:3850
@@ -21,7 +21,7 @@ SIGNET_HOST  — override bind host (default: localhost)
 Authentication
 --------------
 
-The daemon supports three auth modes, set in `agent.yaml`:
+The daemon supports three [[auth]] modes, set in `agent.yaml`:
 
 - `local` — no authentication required. All requests are trusted. This is
   the default for single-user local installs.
@@ -258,9 +258,9 @@ file is missing or unreadable.
 Memories
 --------
 
-The memory API is the primary interface for reading and writing agent memory.
-All write operations respect the `mutationsFrozen` kill switch — if enabled,
-writes return `503`.
+The [[memory]] API is the primary interface for reading and writing agent
+memory. All write operations respect the `mutationsFrozen` kill switch — if
+enabled, writes return `503`. For a typed client wrapper, see the [[sdk]].
 
 ### GET /api/memories
 

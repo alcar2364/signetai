@@ -8,11 +8,11 @@ section: "Infrastructure"
 Dashboard
 =========
 
-The Signet dashboard is a SvelteKit static app served by the daemon at
+The Signet dashboard is a SvelteKit static app served by the [[daemon]] at
 `http://localhost:3850`. It is a supplementary visual interface — useful
-for browsing memory, editing config files, and inspecting daemon state,
-but not the primary way to interact with Signet. The CLI and harness
-integrations are the primary interfaces.
+for browsing [[memory]], editing config files, and inspecting daemon state,
+but not the primary way to interact with Signet. The [[cli|CLI]] and
+[[harnesses|harness]] integrations are the primary interfaces.
 
 
 Accessing the Dashboard

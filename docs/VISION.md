@@ -20,7 +20,7 @@ that allows an agent to perform tasks autonomously for days, weeks,
 or months on end without human intervention.
 
 Safety means gating access to sensitive information. Your bank
-details, API keys, and passwords live in a secrets vault that the
+details, API keys, and passwords live in a [[secrets]] vault that the
 agent never sees and never has to. For business with other agents
 or humans online, Signet agents are assigned identity through
 EIP-8004: Trustless Agents — a protocol that uses blockchains to
@@ -30,7 +30,7 @@ your existing wallet to access your agent and its memory anywhere
 with end-to-end encryption of your agent's identity, skills,
 secrets, and memories.
 
-With Signet, memory and skills become intertwined. Existing
+With Signet, [[memory]] and [[skills]] become intertwined. Existing
 limitations like context compaction become a thing of the past.
 Signet operates in a rolling context window, allowing for
 present-minded actions and thinking while staying within the

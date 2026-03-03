@@ -8,10 +8,10 @@ section: "Reference"
 @signet/sdk
 ===
 
-`@signet/sdk` is a typed TypeScript HTTP client for the Signet daemon API.
-It has no native dependencies — no SQLite, no `@signet/core` — making it
-suitable for embedding in any Node.js, Bun, or browser environment that
-can reach the daemon over HTTP.
+`@signet/sdk` is a typed TypeScript HTTP client for the Signet [[daemon]]
+[[api|API]]. It has no native dependencies — no SQLite, no `@signet/core` —
+making it suitable for embedding in any Node.js, Bun, or browser environment
+that can reach the daemon over HTTP.
 
 Install with:
 
@@ -55,8 +55,8 @@ interface SignetClientConfig {
 ```
 
 `token`, `actor`, and `actorType` are sent as request headers on every
-call. Only GET requests are retried; POST/PATCH/DELETE are not, since
-they are not idempotent by default. Retry backoff is linear at 500ms
+call (see [[auth]] for token details). Only GET requests are retried;
+POST/PATCH/DELETE are not, since they are not idempotent by default. Retry backoff is linear at 500ms
 intervals.
 
 

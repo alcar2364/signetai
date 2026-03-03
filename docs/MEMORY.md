@@ -12,7 +12,7 @@ The memory system is the core persistence layer of Signet. Memories are
 stored in a SQLite database at `~/.agents/memory/memories.db`. Every
 memory has a full-text search index (FTS5), a vector embedding, a
 SHA-256 content hash for deduplication, and a versioned audit trail.
-The daemon owns all writes. Direct database modification is unsupported.
+The [[daemon]] owns all writes. Direct database modification is unsupported.
 
 
 Memory Lifecycle
@@ -41,9 +41,9 @@ ranked list.
 Pipeline V2 Processing
 -----------------------
 
-Pipeline V2 is the autonomous memory processing subsystem. It runs
+[[pipeline|Pipeline V2]] is the autonomous memory processing subsystem. It runs
 after every `remember` call when `pipelineV2.enabled = true` in
-`agent.yaml`.
+`agent.yaml` (see [[configuration]]).
 
 ### Extraction
 
@@ -113,7 +113,7 @@ Empty content after normalization is also skipped. Both cases produce
 ### Graph Entity Persistence
 
 If `pipelineV2.graphEnabled = true`, entities extracted during
-Pipeline V2 are written to the knowledge graph after the main
+Pipeline V2 are written to the [[docs/knowledge-architecture|knowledge graph]] after the main
 transaction commits. This is a separate transaction — graph failure
 never reverts fact extraction. Entities are stored by `canonical_name`
 with a `mentions` count. Relations link source entities to targets
@@ -579,4 +579,4 @@ API Reference Summary
 | `/memory/search` | GET | Legacy keyword-only search |
 | `/api/embeddings` | GET | Export embeddings |
 
-See [API.md](./API.md) for full request/response schemas.
+See [[api]] for full request/response schemas.

@@ -15,7 +15,7 @@ Encrypted storage for API keys and sensitive values. Agents can *use* secrets wi
 
 The core problem with AI agents and secrets: if an agent can read `OPENAI_API_KEY` from the environment, a prompt injection attack or a careless response could leak it.
 
-Signet's solution: secrets are encrypted at rest, and agents never receive decrypted values. When a secret is needed (for embeddings, tool calls, etc.), the daemon resolves it internally — either by using the value directly in API calls or by injecting it into a subprocess environment that the agent cannot inspect.
+Signet's solution: secrets are encrypted at rest, and agents never receive decrypted values. When a secret is needed (for embeddings, tool calls, etc.), the [[daemon]] resolves it internally — either by using the value directly in API calls or by injecting it into a subprocess environment that the agent cannot inspect.
 
 ---
 
@@ -41,7 +41,7 @@ The master key is bound to the machine, so the encrypted file cannot be decrypte
 
 ---
 
-## CLI Commands
+## [[cli|CLI]] Commands
 
 ### Add a secret
 
@@ -110,7 +110,7 @@ signet secret import < secrets.enc.backup
 
 ## Dashboard UI
 
-The dashboard's **Settings → Secrets** panel lets you:
+The [[dashboard]]'s **Settings -> Secrets** panel lets you:
 
 - View all secret names (values always masked as `•••••`)
 - Add new secrets via an input form

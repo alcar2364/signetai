@@ -10,9 +10,9 @@ Connectors
 
 Connectors let Signet pull content from external sources — local
 filesystems, documentation repos, cloud drives — and ingest that
-content into the memory store as searchable documents. Each connector
+content into the memory store as searchable [[documents]]. Each connector
 follows a consistent register-sync-health lifecycle managed through
-the daemon's HTTP API.
+the [[daemon]]'s [[api|HTTP API]].
 
 The connector framework lives in `packages/daemon/src/connectors/`.
 Type definitions are in `packages/core/src/connector-types.ts`.

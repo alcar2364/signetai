@@ -7,7 +7,7 @@ section: "Reference"
 
 # Harnesses
 
-Harnesses are the AI platforms and tools that Signet integrates with. Signet syncs your agent identity and memory to each one.
+Harnesses are the AI platforms and tools that Signet integrates with. Signet syncs your agent identity and [[memory]] to each one via the [[connectors|connector framework]].
 
 ---
 
@@ -15,7 +15,7 @@ Harnesses are the AI platforms and tools that Signet integrates with. Signet syn
 
 When you change `~/.agents/AGENTS.md`:
 
-1. The daemon file watcher detects the change (within 2 seconds)
+1. The [[daemon]] file watcher detects the change (within 2 seconds)
 2. The daemon reads the new content
 3. It prepends an auto-generated header identifying the source
 4. It writes the result to each configured harness location
@@ -60,7 +60,7 @@ Claude Code is Anthropic's official CLI for Claude. It reads configuration from 
 
 ### Memory hooks
 
-Signet writes hooks to `~/.claude/settings.json` that fire at session lifecycle events. The hooks call the Signet CLI, which routes requests through the daemon HTTP API:
+Signet writes [[hooks]] to `~/.claude/settings.json` that fire at session lifecycle events. The hooks call the Signet [[cli|CLI]], which routes requests through the daemon HTTP API:
 
 ```json
 {

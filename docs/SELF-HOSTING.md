@@ -8,9 +8,9 @@ section: "Infrastructure"
 Self-Hosting the Signet Daemon
 ===============================
 
-The Signet daemon is a Hono HTTP server that runs as a background service,
-providing memory storage, search, and the web dashboard. By default it
-binds to `localhost:3850` and requires no authentication. This document
+The Signet [[daemon]] is a Hono HTTP server that runs as a background service,
+providing [[memory]] storage, search, and the web [[dashboard]]. By default it
+binds to `localhost:3850` and requires no [[auth|authentication]]. This document
 covers everything needed to run it persistently, expose it to a team, and
 keep it healthy in production.
 

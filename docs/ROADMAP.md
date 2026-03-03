@@ -24,9 +24,9 @@ Current Focus (0.2.x)
   skill injection into context
 - [wip] Multi-agent support — multiple agent identities per daemon
   (Solvr deployment: Dot, Rose, Miles), shared skills pool, scoped memory
-- [wip] Pipeline stability — memory pipeline v2 hardening, durable async
+- [wip] [[pipeline|Pipeline]] stability — memory pipeline v2 hardening, durable async
   processing, lock-safe transactions
-- [wip] Daemon refactor — extract 7000 LOC daemon.ts into Hono
+- [wip] [[daemon|Daemon]] refactor — extract 7000 LOC daemon.ts into Hono
   sub-routers (~800 LOC coordinator)
 - [wip] Server-side UMAP — dimensionality reduction moved from browser
   to daemon, pre-computed projections
@@ -35,7 +35,7 @@ Current Focus (0.2.x)
 Planned (0.3.x)
 ---
 
-- [next] Wallet auth (ERC-8128) — blockchain-based agent identity
+- [next] Wallet [[auth]] (ERC-8128) — blockchain-based agent identity
   verification
 - [next] Codex connector — platform adapter for OpenAI Codex
 - [next] Retention decay — time-based memory importance decay

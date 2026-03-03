@@ -9,12 +9,12 @@ section: "Core Concepts"
 
 > **Status:** Implemented
 >
-> The `remember` and `recall` commands work via the Signet CLI (`signet remember`,
+> The `remember` and `recall` commands work via the Signet [[cli|CLI]] (`signet remember`,
 > `signet recall`) which calls the daemon HTTP API.
 
 ---
 
-Signet ships with three core skills for memory management: `remember`, `recall`, and `memory-debug`. These integrate directly with the Signet daemon.
+Signet ships with three core [[skills]] for [[memory]] management: `remember`, `recall`, and `memory-debug`. These integrate directly with the Signet [[daemon]].
 
 ## Overview
 

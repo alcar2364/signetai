@@ -30,8 +30,8 @@ What is Signetai?
 ---
 
 Signetai is the reference implementation of Signet, an open standard
-for portable AI agent identity. It includes a CLI tool, background
-daemon with HTTP API, and web dashboard.
+for portable AI agent identity. It includes a [[cli|CLI tool]], background
+[[daemon]] with [[api|HTTP API]], and web [[dashboard]].
 
 **Always read `VISION.md` at the start of every session.** It describes
 what Signet is building toward and should anchor development decisions.
@@ -209,9 +209,10 @@ session tracker enforces one active path per session (409 on conflict).
 
 Pipeline stages: extraction (Ollama, default model `qwen3:4b`) →
 decision (write/update/skip) → optional knowledge graph → retention
-decay → document ingest → maintenance → session summary. Config
-modes: `shadowMode` (extract without writing), `mutationsFrozen`
-(reads only), `graphEnabled`, `autonomousEnabled`.
+decay → document ingest → maintenance → session summary. See
+[[pipeline]] for full details. Config modes: `shadowMode` (extract
+without writing), `mutationsFrozen` (reads only), `graphEnabled`,
+`autonomousEnabled`.
 
 Notable pipeline files beyond the main worker:
 - `summary-worker.ts` — async session-end summarizer (writes dated .md)
@@ -228,7 +229,7 @@ register them in the migrations index.
 
 ### Auth Middleware
 
-The daemon includes an auth module at `packages/daemon/src/auth/`.
+The daemon includes an [[auth]] module at `packages/daemon/src/auth/`.
 Routes under `/api/*` can be protected via token-based middleware
 (`middleware.ts`), with policy rules (`policy.ts`) and rate limiting
 (`rate-limiter.ts`). Tokens are managed in `tokens.ts`.
@@ -286,7 +287,7 @@ All user data lives at `~/.agents/`:
 - `packages/adapters/openclaw/src/index.ts` - OpenClaw runtime adapter
 - `web/src/index.ts` - Website Worker fetch handler
 - `web/public/index.html` - Landing page (single-file, no build step)
-- `docs/ARCHITECTURE.md` - Full technical documentation
+- `docs/ARCHITECTURE.md` - Full technical documentation (see [[architecture]])
 
 Style & Conventions
 ---

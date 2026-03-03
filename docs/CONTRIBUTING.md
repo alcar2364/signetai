@@ -57,24 +57,24 @@ Key Modules
 These are the areas most likely to be touched in non-trivial contributions.
 Familiarize yourself with them before diving in.
 
-**`packages/daemon/src/pipeline/`** is the LLM-based memory extraction
-pipeline. It runs in stages: extraction (`extraction.ts`, uses Ollama by
+**`packages/daemon/src/pipeline/`** is the LLM-based [[pipeline|memory extraction
+pipeline]]. It runs in stages: extraction (`extraction.ts`, uses Ollama by
 default with `qwen3:4b`) → decision (`decision.ts`, write/update/skip) →
 optional graph operations → retention decay. The entrypoint is `worker.ts`;
 `provider.ts` wires up the stages. Config modes like `shadowMode` and
 `mutationsFrozen` are respected here.
 
-**`packages/daemon/src/auth/`** handles ERC-8128 wallet-based auth for the
+**`packages/daemon/src/auth/`** handles ERC-8128 wallet-based [[auth]] for the
 HTTP API. Key files: `middleware.ts` (Hono middleware), `tokens.ts` (token
 lifecycle), `policy.ts` (access rules), `rate-limiter.ts`.
 
-**`packages/daemon/src/connectors/`** is the connector framework used by
+**`packages/daemon/src/connectors/`** is the [[connectors|connector framework]] used by
 the daemon. `registry.ts` manages connector registration; `filesystem.ts`
 handles connector-driven file operations.
 
 **`packages/daemon/src/analytics.ts`**, **`timeline.ts`**, and
-**`diagnostics.ts`** provide observability. Analytics tracks pipeline
-events; timeline records structured agent history; diagnostics exposes
+**`diagnostics.ts`** provide observability. [[analytics|Analytics]] tracks pipeline
+events; timeline records structured agent history; [[diagnostics]] exposes
 health and repair tooling. Tests live alongside each file.
 
 **`packages/core/src/database.ts`** owns the SQLite schema and migrations.

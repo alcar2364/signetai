@@ -8,7 +8,9 @@ section: "Getting Started"
 Quickstart
 ===
 
-Get Signet running in about five minutes.
+Get Signet running in about five minutes. For the full
+[[configuration]] reference, see that doc. For [[cli|CLI commands]], see
+[[cli]].
 
 ---
 
@@ -105,8 +107,8 @@ search. 0.7 (70% semantic, 30% keyword) works well for most people.
 The wizard can initialize a git repo in `~/.agents/` so every change to
 your agent files is automatically versioned.
 
-After the wizard completes, the daemon starts automatically and the
-dashboard opens at `http://localhost:3850`.
+After the wizard completes, the [[daemon]] starts automatically and the
+[[dashboard]] opens at `http://localhost:3850`.
 
 ---
 
@@ -145,7 +147,7 @@ What Signet Does
 Once running, Signet gives you a persistent agent identity that works
 across all your AI tools. The core features:
 
-- **Memory pipeline** — conversations are processed automatically by
+- **[[pipeline|Memory pipeline]]** — conversations are processed automatically by
   Pipeline V2, which extracts meaningful facts and decisions using a
   local LLM (default: `qwen3:4b` via Ollama). Memories accumulate over
   time and are recalled in future sessions.

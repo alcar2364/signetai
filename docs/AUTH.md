@@ -8,7 +8,7 @@ section: "Reference"
 Auth
 ===
 
-Auth is optional. By default the daemon runs in `local` mode: no tokens,
+Auth is optional. By default the [[daemon]] runs in `local` mode: no tokens,
 no authentication, localhost-only binding. Auth exists for team and remote
 deployments where the daemon is shared or exposed over a network.
 
@@ -67,7 +67,8 @@ Default TTLs: 7 days for regular tokens (`defaultTokenTtlSeconds: 604800`),
 configurable in `agent.yaml`.
 
 Generate a token: `POST /api/auth/token` with `{ role, scope? }` in the
-request body. Inspect the current token: `GET /api/auth/whoami`.
+request body. Inspect the current token: `GET /api/auth/whoami`. See
+[[api|HTTP API]] for full endpoint details.
 
 
 Roles and Permissions
@@ -161,9 +162,9 @@ All rate limit configs can be overridden in `agent.yaml` under the
 Configuration
 ---
 
-Auth is configured in `agent.yaml` under the `auth:` key. All fields
-are optional — omitting the section entirely gives you `local` mode
-with defaults.
+Auth is configured in `agent.yaml` under the `auth:` key (see
+[[configuration]]). All fields are optional — omitting the section
+entirely gives you `local` mode with defaults.
 
 ```yaml
 auth:

@@ -8,9 +8,9 @@ section: "Infrastructure"
 Diagnostics and Repair
 ===
 
-The daemon continuously monitors the health of the memory pipeline through
-a read-only diagnostics system and a set of policy-gated repair actions. An
-optional maintenance worker ties them together, running repairs autonomously
+The [[daemon]] continuously monitors the health of the [[pipeline|memory pipeline]]
+through a read-only diagnostics system and a set of policy-gated repair actions.
+An optional maintenance worker ties them together, running repairs autonomously
 on a schedule.
 
 Source files:
@@ -155,9 +155,9 @@ memory ingestion entirely.
 API Endpoints
 ---
 
-Both endpoints require the `diagnostics` permission. In local auth mode
+Both endpoints require the `diagnostics` permission. In local [[auth]] mode
 this is always granted. With token auth, the token must include the
-`diagnostics` scope.
+`diagnostics` scope. See [[api]] for the full endpoint reference.
 
 ### GET /api/diagnostics
 

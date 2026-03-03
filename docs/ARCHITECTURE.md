@@ -8,7 +8,7 @@ section: "Infrastructure"
 Signet Architecture
 ===================
 
-Technical reference for the Signet daemon and supporting packages.
+Technical reference for the Signet [[daemon]] and supporting packages.
 This document covers the full system — from package boundaries through
 database schema — with enough detail to reason about correctness,
 performance, and failure modes.
@@ -47,7 +47,7 @@ thin.
 implements `install`, `uninstall`, `isInstalled`, and `getConfigPath`.
 
 `@signet/sdk` is the embedding library for third-party apps that want
-to call the daemon API without shelling out to the CLI.
+to call the daemon [[api|HTTP API]] without shelling out to the [[cli|CLI]].
 
 `@signet/opencode-plugin` is the runtime plugin for OpenCode. It
 provides memory tools and session lifecycle hooks that call the daemon
@@ -287,7 +287,7 @@ limit is exceeded, the response is 429 with a `Retry-After` header.
 Analytics
 ---------
 
-`packages/daemon/src/analytics.ts` implements an in-memory analytics
+`packages/daemon/src/analytics.ts` implements an in-memory [[analytics]]
 accumulator. All state is ephemeral — it resets on daemon restart.
 Durable history lives in `memory_history` and structured logs.
 
@@ -317,8 +317,8 @@ Connector Framework
 -------------------
 
 The connector framework manages external data source integrations that
-push documents and memories into the pipeline. It is distinct from the
-harness connector packages (claude-code, opencode, openclaw) — those
+push documents and memories into the [[pipeline]]. It is distinct from the
+[[harnesses|harness connector packages]] (claude-code, opencode, openclaw) — those
 handle platform hook installation; this framework handles ongoing sync.
 
 **Registry** (`connectors/registry.ts`): CRUD operations on the

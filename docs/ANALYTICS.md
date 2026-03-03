@@ -8,9 +8,9 @@ section: "Infrastructure"
 Analytics, Timeline, and Diagnostics
 ===
 
-The Signet daemon exposes real-time operational visibility through three
+The Signet [[daemon]] exposes real-time operational visibility through three
 subsystems: an in-memory analytics accumulator, an incident timeline
-builder, and a health diagnostics scorer. Together they let operators
+builder, and a health [[diagnostics]] scorer. Together they let operators
 understand what the daemon is doing right now, reconstruct what happened
 to a specific memory or request, and get a structured assessment of
 overall system health.
@@ -28,7 +28,8 @@ any write overhead.
 
 If you need to track trends across restarts, read from `memory_history`
 and the log files directly. The analytics endpoints are a real-time
-operational view, not a database replacement.
+operational view, not a database replacement. For the complete endpoint
+reference, see [[api]].
 
 
 Usage Counters
@@ -162,9 +163,10 @@ deducts 0.3. The `dbSizeBytes` field is always 0 from a read connection
 
 **Index** (weight 0.19) compares the FTS5 content table row count against
 active (non-deleted) memory rows, and measures embedding coverage —
-the fraction of active memories that have an `embedding_model` set. FTS
-mismatch (FTS row count more than 10% above active count, indicating
-tombstones are surfacing in full-text search) deducts 0.5. Embedding
+the fraction of active memories that have an `embedding_model` set (see
+[[memory]] for how memories are stored). FTS mismatch (FTS row count
+more than 10% above active count, indicating tombstones are surfacing
+in full-text search) deducts 0.5. Embedding
 coverage below 80% deducts 0.3.
 
 **Provider** (weight 0.24) uses a separate in-memory ring buffer
@@ -176,7 +178,7 @@ rate (successes / total). With no data yet, the rate defaults to 1.0.
 `deleted` events in the last 7 days. More than 5 recoveries in that
 window suggests repeated wrong-target deletes and deducts 0.3.
 
-**Connector** (weight 0.05) reads the `connectors` table for total
+**Connector** (weight 0.05) reads the [[connectors]] table for total
 connector count, how many are currently syncing, how many have a
 non-null `last_error`, and the age of the oldest unresolved error.
 Any errors deduct 0.3; an error older than 24 hours deducts an
