@@ -100,6 +100,7 @@ import {
 	reembedMissingMemories,
 	releaseStaleLeases,
 	requeueDeadJobs,
+	resyncVectorIndex,
 	triggerRetentionSweep,
 } from "./repair-actions";
 import { CRON_PRESETS, computeNextRun, isHarnessAvailable, startSchedulerWorker, validateCron } from "./scheduler";
@@ -5274,6 +5275,13 @@ app.post("/api/repair/re-embed", async (c) => {
 		dryRun,
 	);
 
+	return c.json(result, result.success ? 200 : 429);
+});
+
+app.post("/api/repair/resync-vec", (c) => {
+	const cfg = loadMemoryConfig(AGENTS_DIR);
+	const ctx = resolveRepairContext(c);
+	const result = resyncVectorIndex(getDbAccessor(), cfg.pipelineV2, ctx, repairLimiter);
 	return c.json(result, result.success ? 200 : 429);
 });
 
