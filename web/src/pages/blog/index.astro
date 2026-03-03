@@ -10,7 +10,7 @@ const posts = (await getCollection('blog'))
   .filter((post) => !post.data.draft)
   .sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
 
-const siteUrl = Astro.site?.toString().replace(/\/$/, '') ?? 'https://www.signetai.sh';
+const siteUrl = Astro.site?.toString().replace(/\/$/, '') ?? 'https://signetai.sh';
 ---
 
 <Base title="Blog — SignetAI" description="Updates, ideas, and technical writing from the Signet team.">

@@ -22,7 +22,7 @@ const toc = headings
   .filter((heading) => heading.depth === 2 || heading.depth === 3)
   .slice(0, 24);
 
-const siteUrl = Astro.site?.toString().replace(/\/$/, '') ?? 'https://www.signetai.sh';
+const siteUrl = Astro.site?.toString().replace(/\/$/, '') ?? 'https://signetai.sh';
 const pageUrl = `${siteUrl}/docs/${currentSlug}/`;
 ---
 

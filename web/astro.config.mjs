@@ -6,7 +6,7 @@ import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   output: 'static',
-  site: 'https://www.signetai.sh',
+  site: 'https://signetai.sh',
   integrations: [
     mdx(),
     react(),

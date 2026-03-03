@@ -21,8 +21,8 @@ const {
   type = 'website',
 } = Astro.props;
 
-const canonicalUrl = new URL(Astro.url.pathname, Astro.site ?? 'https://www.signetai.sh');
-const imageUrl = new URL(image, Astro.site ?? 'https://www.signetai.sh');
+const canonicalUrl = new URL(Astro.url.pathname, Astro.site ?? 'https://signetai.sh');
+const imageUrl = new URL(image, Astro.site ?? 'https://signetai.sh');
 ---
 
 <!doctype html>
@@ -66,6 +66,9 @@ const imageUrl = new URL(image, Astro.site ?? 'https://www.signetai.sh');
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonicalUrl.href} />
     <meta property="og:image" content={imageUrl.href} />
+    <meta property="og:image:width" content="1408" />
+    <meta property="og:image:height" content="768" />
+    <meta property="og:image:type" content="image/png" />
 
     <!-- Twitter/X Card -->
     <meta name="twitter:card" content="summary_large_image" />

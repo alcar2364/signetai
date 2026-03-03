@@ -19,7 +19,7 @@ function stripHtml(html: string): string {
 }
 
 export async function GET(context: APIContext) {
-  const site = context.site?.toString().replace(/\/$/, '') ?? 'https://www.signetai.sh';
+  const site = context.site?.toString().replace(/\/$/, '') ?? 'https://signetai.sh';
   const docs = await getCollection('docs');
   const blog = await getCollection('blog');
 

@@ -75,7 +75,7 @@ export async function GET(context: APIContext) {
     title: 'SignetAI',
     description:
       'Signet is local-first agent infrastructure. Portable memory, encrypted secrets, and identity that lives on your machine.',
-    site: context.site?.toString() ?? 'https://www.signetai.sh',
+    site: context.site?.toString() ?? 'https://signetai.sh',
     items,
     customData: '<language>en-us</language>',
   });

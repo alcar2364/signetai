@@ -29,8 +29,25 @@ const nextPost = currentIndex < allPosts.length - 1
   ? { title: allPosts[currentIndex + 1].data.title, url: `/blog/${allPosts[currentIndex + 1].id}/` }
   : undefined;
 
-const siteUrl = Astro.site?.toString().replace(/\/$/, '') ?? 'https://www.signetai.sh';
+const siteUrl = Astro.site?.toString().replace(/\/$/, '') ?? 'https://signetai.sh';
 const pageUrl = `${siteUrl}/blog/${post.id}/`;
+
+// Recommended posts: score by shared tags, sort by score then date
+const currentTags = new Set(post.data.tags);
+const recommended = allPosts
+  .filter((p) => p.id !== post.id)
+  .map((p) => ({
+    post: p,
+    score: p.data.tags.filter((t: string) => currentTags.has(t)).length,
+  }))
+  .filter((r) => r.score > 0)
+  .sort((a, b) => b.score - a.score || b.post.data.date.getTime() - a.post.data.date.getTime())
+  .slice(0, 3)
+  .map((r) => ({
+    title: r.post.data.title,
+    url: `/blog/${r.post.id}/`,
+    image: r.post.data.image,
+  }));
 ---
 
 <Blog
@@ -43,6 +60,8 @@ const pageUrl = `${siteUrl}/blog/${post.id}/`;
   headings={headings}
   previousPost={previousPost}
   nextPost={nextPost}
+  pageUrl={pageUrl}
+  recommendedPosts={recommended}
 >
   <StructuredData data={{
     '@context': 'https://schema.org',
