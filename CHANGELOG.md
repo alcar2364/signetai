@@ -2,6 +2,22 @@
 
 All notable changes to Signet are documented here.
 
+## [0.35.4] - 2026-03-03
+
+### Features
+
+- **web**: docs layout redesign, blog updates, and graph viewer
+- **web**: blog layout polish, share buttons, and SEO fixes
+
+### Bug Fixes
+
+- **web**: widen docs and blog content columns
+
+### Docs
+
+- integrate addendum sections into knowledge architecture body
+
+
 ## [0.35.3] - 2026-03-03
 
 ### Bug Fixes
