@@ -2,6 +2,13 @@
 
 All notable changes to Signet are documented here.
 
+## [0.31.1] - 2026-03-03
+
+### Bug Fixes
+
+- dashboard config persistence, version display, auto-update self-restart, and docs cleanup
+
+
 ## [0.31.0] - 2026-03-03
 
 ### Bug Fixes
