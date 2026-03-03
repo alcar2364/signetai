@@ -2,6 +2,13 @@
 
 All notable changes to Signet are documented here.
 
+## [0.33.3] - 2026-03-03
+
+### Bug Fixes
+
+- **daemon**: fix native embedding init by properly externalizing onnxruntime-node
+
+
 ## [0.33.2] - 2026-03-03
 
 ### Bug Fixes
