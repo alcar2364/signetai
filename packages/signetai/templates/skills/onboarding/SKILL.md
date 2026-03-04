@@ -647,7 +647,10 @@ simultaneously causes token burn and duplicate context.
 
 ```bash
 # Find OpenClaw configs
-find ~/.openclaw ~/.clawdbot ~/.moltbot ~/.config/openclaw \
+# Find OpenClaw configs
+find ~/.openclaw ~/.clawdbot ~/.moltbot \
+  ~/.config/openclaw ~/.config/clawdbot ~/.config/moltbot \
+  ~/.local/state/openclaw ~/.local/state/clawdbot ~/.local/state/moltbot \
   -name "*.json" -o -name "*.json5" 2>/dev/null
 ```
 
