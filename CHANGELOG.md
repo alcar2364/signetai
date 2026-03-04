@@ -2,6 +2,13 @@
 
 All notable changes to Signet are documented here.
 
+## [0.38.2] - 2026-03-04
+
+### Bug Fixes
+
+- **daemon**: bump extraction timeout default from 45s to 90s
+
+
 ## [0.38.1] - 2026-03-04
 
 ### Bug Fixes
