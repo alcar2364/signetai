@@ -493,7 +493,12 @@ function formatMarkdown(report: DriftReport): string {
 // Main
 // ---------------------------------------------------------------------------
 
-const format = process.argv.includes("--markdown") ? "markdown" : "json";
+const args = process.argv.slice(2);
+const format = args.includes("--markdown") ? "markdown" : "json";
+if (args.some((a) => a.startsWith("--") && a !== "--markdown" && a !== "--json")) {
+  console.error(`Unknown flag(s): ${args.filter((a) => a.startsWith("--")).join(", ")}`);
+  process.exit(2);
+}
 const report = generateReport();
 
 if (format === "markdown") {
