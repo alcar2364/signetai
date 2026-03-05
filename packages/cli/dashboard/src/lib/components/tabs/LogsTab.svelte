@@ -40,6 +40,7 @@ let logLevelFilter = $state<string>("");
 let logCategoryFilter = $state<string>("");
 let logAutoScroll = $state(false);
 let logAutoScrollPausedByScroll = $state(false);
+let initialLoadDone = $state(false);
 let logViewport = $state<HTMLElement | null>(null);
 let selectedLogKey = $state<string | null>(null);
 let copied = $state(false);
@@ -180,7 +181,10 @@ async function fetchLogs() {
 		const data = await res.json();
 		logs = data.logs || [];
 		selectLatestLog();
-		if (logAutoScroll) {
+		if (!initialLoadDone) {
+			initialLoadDone = true;
+			void tick().then(() => scrollToBottom("auto"));
+		} else if (logAutoScroll) {
 			scrollToBottomNextFrame("auto");
 		}
 	} catch {
@@ -215,6 +219,10 @@ function startLogStream() {
 				logsStreaming = true;
 				streamError = "";
 				return;
+			}
+			if (logsConnecting) {
+				logsConnecting = false;
+				logsStreaming = true;
 			}
 			const entryLevelValue =
 				typeof entry.level === "string"
