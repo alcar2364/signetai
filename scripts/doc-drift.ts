@@ -106,6 +106,7 @@ function extractRoutesFromSource(): RouteEntry[] {
 	for (const file of files) {
 		if (!fileExists(file)) continue;
 		const content = read(file);
+		routePattern.lastIndex = 0;
 		let match: RegExpExecArray | null = null;
 		while ((match = routePattern.exec(content)) !== null) {
 			const method = match[1].toUpperCase();
@@ -529,8 +530,8 @@ function formatMarkdown(report: DriftReport): string {
 const args = process.argv.slice(2);
 const format = args.includes("--markdown") ? "markdown" : "json";
 if (args.some((a) => a.startsWith("--") && a !== "--markdown" && a !== "--json")) {
-  console.error(`Unknown flag(s): ${args.filter((a) => a.startsWith("--")).join(", ")}`);
-  process.exit(2);
+	console.error(`Unknown flag(s): ${args.filter((a) => a.startsWith("--")).join(", ")}`);
+	process.exit(2);
 }
 const report = generateReport();
 
