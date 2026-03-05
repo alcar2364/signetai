@@ -35,6 +35,10 @@ export interface SessionMemoryCandidate {
  * Batch-insert all candidate memories for a session. Candidates that
  * were actually injected get was_injected=1; the rest get 0.
  * Safe to call with an empty candidates array (no-op).
+ *
+ * Optimization: Uses multi-row INSERTs to minimize bridge overhead
+ * between Bun and SQLite. Records are processed in chunks of 50 to
+ * stay safely within SQLite's parameter limits.
  */
 export function recordSessionCandidates(
 	sessionKey: string | undefined,
@@ -46,27 +50,38 @@ export function recordSessionCandidates(
 	try {
 		getDbAccessor().withWriteTx((db) => {
 			const now = new Date().toISOString();
-			const stmt = db.prepare(
-				`INSERT OR IGNORE INTO session_memories
-				 (id, session_key, memory_id, source, effective_score,
-				  final_score, rank, was_injected, fts_hit_count, created_at)
-				 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
-			);
+			const CHUNK_SIZE = 50;
 
 			let rank = 0;
-			for (const c of candidates) {
-				const wasInjected = injectedIds.has(c.id) ? 1 : 0;
-				stmt.run(
-					crypto.randomUUID(),
-					sessionKey,
-					c.id,
-					c.source,
-					c.effScore,
-					c.effScore, // final_score = effective_score until predictor exists
-					rank++,
-					wasInjected,
-					now,
+			for (let i = 0; i < candidates.length; i += CHUNK_SIZE) {
+				const chunk = candidates.slice(i, i + CHUNK_SIZE);
+
+				// Multi-row INSERT: (?,?,?,?,?,?,?,?,0,?), (?,?,?,?,?,?,?,?,0,?), ...
+				const placeholders = Array.from({ length: chunk.length }, () => "(?,?,?,?,?,?,?,?,0,?)").join(",");
+				const stmt = db.prepare(
+					`INSERT OR IGNORE INTO session_memories
+					 (id, session_key, memory_id, source, effective_score,
+					  final_score, rank, was_injected, fts_hit_count, created_at)
+					 VALUES ${placeholders}`,
 				);
+
+				const values: unknown[] = [];
+				for (const c of chunk) {
+					const wasInjected = injectedIds.has(c.id) ? 1 : 0;
+					values.push(
+						crypto.randomUUID(),
+						sessionKey,
+						c.id,
+						c.source,
+						c.effScore,
+						c.effScore, // final_score = effective_score until predictor exists
+						rank++,
+						wasInjected,
+						now,
+					);
+				}
+
+				stmt.run(...values);
 			}
 		});
 
@@ -91,32 +106,29 @@ export function recordSessionCandidates(
  * Increment fts_hit_count for memories matched during user prompt handling.
  * If a memory wasn't a session-start candidate, inserts a new row with
  * source='fts_only'.
+ *
+ * Optimization: Uses SQLite UPSERT (INSERT ... ON CONFLICT DO UPDATE) to
+ * collapse two queries into one, reducing roundtrips.
  */
-export function trackFtsHits(
-	sessionKey: string | undefined,
-	matchedIds: ReadonlyArray<string>,
-): void {
+export function trackFtsHits(sessionKey: string | undefined, matchedIds: ReadonlyArray<string>): void {
 	if (!sessionKey || matchedIds.length === 0 || !existsSync(getMemoryDbPath())) return;
 
 	try {
 		getDbAccessor().withWriteTx((db) => {
 			const now = new Date().toISOString();
-			const updateStmt = db.prepare(
-				`UPDATE session_memories
-				 SET fts_hit_count = fts_hit_count + 1
-				 WHERE session_key = ? AND memory_id = ?`,
-			);
-			const insertStmt = db.prepare(
-				`INSERT OR IGNORE INTO session_memories
+
+			// COLLAPSE: Use UPSERT to handle both new hits and existing candidate updates
+			const stmt = db.prepare(`
+				INSERT INTO session_memories
 				 (id, session_key, memory_id, source, effective_score,
 				  final_score, rank, was_injected, fts_hit_count, created_at)
-				 VALUES (?, ?, ?, 'fts_only', 0, 0, 0, 0, 1, ?)`,
-			);
+				 VALUES (?, ?, ?, 'fts_only', 0, 0, 0, 0, 1, ?)
+				 ON CONFLICT(session_key, memory_id) DO UPDATE SET
+				  fts_hit_count = fts_hit_count + 1
+			`);
 
 			for (const id of matchedIds) {
-				updateStmt.run(sessionKey, id);
-				// INSERT OR IGNORE is a no-op if the row already exists
-				insertStmt.run(crypto.randomUUID(), sessionKey, id, now);
+				stmt.run(crypto.randomUUID(), sessionKey, id, now);
 			}
 		});
 	} catch (e) {
