@@ -1260,13 +1260,17 @@ $effect(() => {
 		if (rawNewSince === "true") {
 			showNewSinceLastSeen = true;
 		}
+	} catch {
+		// Ignore sessionStorage read failures and keep in-memory defaults.
+	}
+	try {
 		const rawLastSeen = window.localStorage.getItem(LAST_SEEN_STORAGE_KEY);
 		if (rawLastSeen) {
 			const parsed = Number.parseInt(rawLastSeen, 10);
 			if (!Number.isNaN(parsed)) lastSeenMs = parsed;
 		}
 	} catch {
-		// Ignore storage read failures and keep in-memory defaults.
+		// Ignore localStorage read failures and keep in-memory defaults.
 	}
 	try {
 		window.localStorage.removeItem(LEGACY_NODE_COLOR_MODE_STORAGE_KEY);
