@@ -33,11 +33,13 @@ let logsReconnecting = $state(false);
 let logsConnecting = $state(false);
 let streamError = $state("");
 let logEventSource: EventSource | null = null;
+let streamEnabled = $state(true);
 let reconnectAttempt = 0;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let logLevelFilter = $state<string>("");
 let logCategoryFilter = $state<string>("");
 let logAutoScroll = $state(false);
+let logAutoScrollPausedByScroll = $state(false);
 let logViewport = $state<HTMLElement | null>(null);
 let selectedLogKey = $state<string | null>(null);
 let copied = $state(false);
@@ -189,12 +191,18 @@ async function fetchLogs() {
 }
 
 function startLogStream() {
+	if (!streamEnabled) return;
+
 	if (reconnectTimer !== null) {
 		clearTimeout(reconnectTimer);
 		reconnectTimer = null;
 	}
 	if (logEventSource) logEventSource.close();
 	logsConnecting = true;
+	if (reconnectAttempt === 0) {
+		logsReconnecting = false;
+		streamError = "";
+	}
 	logEventSource = new EventSource("/api/logs/stream");
 
 	logEventSource.onmessage = (event) => {
@@ -228,6 +236,8 @@ function startLogStream() {
 	};
 
 	logEventSource.onerror = () => {
+		if (!streamEnabled) return;
+
 		logsStreaming = false;
 		logsConnecting = false;
 		logEventSource?.close();
@@ -236,7 +246,7 @@ function startLogStream() {
 		if (reconnectTimer !== null) return;
 
 		const delay = Math.min(RECONNECT_BASE_MS * 2 ** Math.min(reconnectAttempt, 10), RECONNECT_MAX_MS);
-		reconnectAttempt++;
+		reconnectAttempt = Math.min(reconnectAttempt + 1, 10);
 		logsReconnecting = true;
 		streamError = `Stream lost — reconnecting in ${delay / 1000}s`;
 
@@ -245,6 +255,42 @@ function startLogStream() {
 			startLogStream();
 		}, delay);
 	};
+}
+
+function stopLogStream(): void {
+	streamEnabled = false;
+	logsStreaming = false;
+	logsConnecting = false;
+	logsReconnecting = false;
+	streamError = "";
+	reconnectAttempt = 0;
+
+	if (reconnectTimer !== null) {
+		clearTimeout(reconnectTimer);
+		reconnectTimer = null;
+	}
+
+	if (logEventSource) {
+		logEventSource.close();
+		logEventSource = null;
+	}
+}
+
+function manualStartLogStream(): void {
+	streamEnabled = true;
+	reconnectAttempt = 0;
+	logsReconnecting = false;
+	streamError = "";
+	startLogStream();
+}
+
+function toggleLogStream(): void {
+	if (streamEnabled) {
+		stopLogStream();
+		return;
+	}
+
+	manualStartLogStream();
 }
 
 function formatLogTime(timestamp: string): string {
@@ -333,8 +379,9 @@ async function copySelectedLog(): Promise<void> {
 
 onMount(() => {
 	fetchLogs();
-	startLogStream();
+	manualStartLogStream();
 	return () => {
+		streamEnabled = false;
 		if (autoScrollSnapFrame !== null) cancelAnimationFrame(autoScrollSnapFrame);
 		if (reconnectTimer !== null) clearTimeout(reconnectTimer);
 		if (logEventSource) logEventSource.close();
@@ -349,10 +396,12 @@ $effect(() => {
 		const nearBottom = isNearBottom(viewport);
 		if (logAutoScroll && !nearBottom) {
 			logAutoScroll = false;
+			logAutoScrollPausedByScroll = true;
 			return;
 		}
-		if (!logAutoScroll && nearBottom) {
+		if (!logAutoScroll && logAutoScrollPausedByScroll && nearBottom) {
 			logAutoScroll = true;
+			logAutoScrollPausedByScroll = false;
 		}
 	};
 
@@ -394,6 +443,7 @@ $effect(() => {
 				<label class="flex items-center gap-1.5 sig-label text-[var(--sig-text)] cursor-pointer">
 					<Checkbox checked={logAutoScroll} onCheckedChange={(value: unknown) => {
 						logAutoScroll = value === true;
+						logAutoScrollPausedByScroll = false;
 						if (logAutoScroll) {
 							scrollToBottomNextFrame("auto");
 						}
@@ -417,6 +467,15 @@ $effect(() => {
 							● Offline
 						{/if}
 					</span>
+					<Button
+						variant="outline"
+						size="sm"
+						class="sig-label px-2 py-1 h-auto hover:border-[var(--sig-border-strong)] hover:text-[var(--sig-text-bright)]"
+						onclick={toggleLogStream}
+						title={streamEnabled ? "Disconnect stream" : "Reconnect stream"}
+					>
+						{streamEnabled ? "Disconnect" : "Reconnect"}
+					</Button>
 					<Button
 						variant="outline"
 						size="sm"

@@ -81,6 +81,7 @@ class Logger extends EventEmitter {
 	private currentLogFile: string;
 	private buffer: LogEntry[] = [];
 	private flushTimer: ReturnType<typeof setInterval> | null = null;
+	private static readonly LOG_FILE_PATTERN = /^signet-(\d{4}-\d{2}-\d{2})(?:-(.+))?\.log$/;
 
 	constructor(config: Partial<LoggerConfig> = {}) {
 		super();
@@ -103,6 +104,45 @@ class Logger extends EventEmitter {
 
 	private shouldLog(level: LogLevel): boolean {
 		return LOG_LEVELS[level] >= LOG_LEVELS[this.config.level];
+	}
+
+	private parseLogFileName(fileName: string): { date: string; archiveSuffix: string | null } | null {
+		const match = Logger.LOG_FILE_PATTERN.exec(fileName);
+		if (!match) return null;
+		return {
+			date: match[1],
+			archiveSuffix: match[2] ?? null,
+		};
+	}
+
+	private compareLogFilesNewestFirst(aName: string, bName: string): number {
+		const aMeta = this.parseLogFileName(aName);
+		const bMeta = this.parseLogFileName(bName);
+
+		if (!aMeta && !bMeta) return bName.localeCompare(aName);
+		if (!aMeta) return 1;
+		if (!bMeta) return -1;
+
+		const byDate = bMeta.date.localeCompare(aMeta.date);
+		if (byDate !== 0) return byDate;
+
+		const aIsArchive = aMeta.archiveSuffix !== null;
+		const bIsArchive = bMeta.archiveSuffix !== null;
+		if (aIsArchive !== bIsArchive) return aIsArchive ? 1 : -1;
+
+		if (!aIsArchive) return bName.localeCompare(aName);
+
+		return (bMeta.archiveSuffix ?? "").localeCompare(aMeta.archiveSuffix ?? "");
+	}
+
+	private listLogFilesNewestFirst(): Array<{ name: string; path: string }> {
+		return readdirSync(this.config.logDir)
+			.filter((f) => this.parseLogFileName(f) !== null)
+			.map((f) => ({
+				name: f,
+				path: join(this.config.logDir, f),
+			}))
+			.sort((a, b) => this.compareLogFilesNewestFirst(a.name, b.name));
 	}
 
 	private formatConsole(entry: LogEntry): string {
@@ -214,13 +254,7 @@ class Logger extends EventEmitter {
 
 	private cleanOldLogs() {
 		try {
-			const files = readdirSync(this.config.logDir)
-				.filter((f) => f.startsWith("signet-") && f.endsWith(".log"))
-				.map((f) => ({
-					name: f,
-					path: join(this.config.logDir, f),
-				}))
-				.sort((a, b) => b.name.localeCompare(a.name));
+			const files = this.listLogFilesNewestFirst();
 
 			// Keep only maxFiles
 			for (let i = this.config.maxFiles; i < files.length; i++) {
@@ -369,14 +403,8 @@ class Logger extends EventEmitter {
 		const results: LogEntry[] = [];
 
 		try {
-			// Get all log files sorted by date in filename (newest first)
-			const logFiles = readdirSync(this.config.logDir)
-				.filter((f) => f.startsWith("signet-") && f.endsWith(".log"))
-				.map((f) => ({
-					name: f,
-					path: join(this.config.logDir, f),
-				}))
-				.sort((a, b) => b.name.localeCompare(a.name));
+			// Get all log files sorted by canonical log date (newest first)
+			const logFiles = this.listLogFilesNewestFirst();
 
 			// Read files until we have enough entries
 			for (const file of logFiles) {
@@ -390,8 +418,6 @@ class Logger extends EventEmitter {
 					const recentLines = lines.slice(-(limit * 2));
 
 					for (const line of recentLines) {
-						if (results.length >= limit * 2) break;
-
 						try {
 							const entry = JSON.parse(line) as LogEntry;
 
