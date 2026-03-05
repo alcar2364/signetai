@@ -103,6 +103,8 @@ const LEGEND_PRIORITY_SOURCES = ["daemon", "user", "opencode"] as const;
 const LEGEND_PRIORITY_SOURCE_SET = new Set<string>(LEGEND_PRIORITY_SOURCES);
 
 const NODE_COLOR_MODE_SESSION_STORAGE_KEY = "signet-constellation-color-mode-session";
+const LEGACY_NODE_COLOR_MODE_STORAGE_KEY = "signet-constellation-color-mode";
+const LEGACY_NEW_SINCE_STORAGE_KEY = "signet-constellation-new-since";
 const LAST_SEEN_STORAGE_KEY = "signet-constellation-last-seen";
 
 type TimeFilterPreset = "all" | "24h" | "7d" | "30d" | "90d" | "custom";
@@ -1258,6 +1260,8 @@ $effect(() => {
 			const parsed = Number.parseInt(rawLastSeen, 10);
 			if (!Number.isNaN(parsed)) lastSeenMs = parsed;
 		}
+		window.localStorage.removeItem(LEGACY_NODE_COLOR_MODE_STORAGE_KEY);
+		window.localStorage.removeItem(LEGACY_NEW_SINCE_STORAGE_KEY);
 	} catch {
 		// Ignore storage read failures and keep in-memory defaults.
 	} finally {
@@ -1849,6 +1853,12 @@ $effect(() => {
 							<div class="font-[family-name:var(--font-mono)] text-[10px] uppercase tracking-[0.08em] text-[var(--sig-text-muted)]">Overlays</div>
 							<div class="flex flex-wrap gap-1">
 								<button class="px-2 py-[2px] font-[family-name:var(--font-mono)] text-[10px] uppercase border border-[var(--sig-border-strong)] {showNewSinceLastSeen && nodeColorMode !== 'none' ? 'text-[var(--sig-text-bright)] bg-[var(--sig-surface-raised)]' : 'text-[var(--sig-text-muted)] bg-transparent'}" onclick={() => (showNewSinceLastSeen = !showNewSinceLastSeen)}>New since last seen</button>
+								</div>
+							</div>
+							<div class="border border-[var(--sig-border)] px-2 py-2 space-y-1.5">
+								<div class="font-[family-name:var(--font-mono)] text-[10px] uppercase tracking-[0.08em] text-[var(--sig-text-muted)]">Overlays</div>
+								<div class="flex flex-wrap gap-1">
+									<button class="px-2 py-[2px] font-[family-name:var(--font-mono)] text-[10px] uppercase border border-[var(--sig-border-strong)] {showNewSinceLastSeen && nodeColorMode !== 'none' ? 'text-[var(--sig-text-bright)] bg-[var(--sig-surface-raised)]' : 'text-[var(--sig-text-muted)] bg-transparent'}" onclick={() => (showNewSinceLastSeen = !showNewSinceLastSeen)}>New since last seen</button>
 								</div>
 							</div>
 							<div class="border border-[var(--sig-border)] px-2 py-2 space-y-1.5">
