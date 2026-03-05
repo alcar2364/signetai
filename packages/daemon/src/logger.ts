@@ -219,9 +219,8 @@ class Logger extends EventEmitter {
 				.map((f) => ({
 					name: f,
 					path: join(this.config.logDir, f),
-					mtime: statSync(join(this.config.logDir, f)).mtime.getTime(),
 				}))
-				.sort((a, b) => b.mtime - a.mtime);
+				.sort((a, b) => b.name.localeCompare(a.name));
 
 			// Keep only maxFiles
 			for (let i = this.config.maxFiles; i < files.length; i++) {
@@ -357,7 +356,7 @@ class Logger extends EventEmitter {
 		},
 	};
 
-	// Get recent logs
+	// Get recent logs (reads across all log files, not just current day)
 	getRecent(
 		options: {
 			limit?: number;
@@ -370,27 +369,49 @@ class Logger extends EventEmitter {
 		const results: LogEntry[] = [];
 
 		try {
-			// Read from current log file
-			if (existsSync(this.currentLogFile)) {
-				const content = readFileSync(this.currentLogFile, "utf-8");
-				const lines = content.trim().split("\n").filter(Boolean);
+			// Get all log files sorted by date in filename (newest first)
+			const logFiles = readdirSync(this.config.logDir)
+				.filter((f) => f.startsWith("signet-") && f.endsWith(".log"))
+				.map((f) => ({
+					name: f,
+					path: join(this.config.logDir, f),
+				}))
+				.sort((a, b) => b.name.localeCompare(a.name));
 
-				for (const line of lines.slice(-limit * 2)) {
-					// Read extra for filtering
-					try {
-						const entry = JSON.parse(line) as LogEntry;
+			// Read files until we have enough entries
+			for (const file of logFiles) {
+				if (results.length >= limit * 2) break; // Read extra for filtering
 
-						// Apply filters
-						if (level && LOG_LEVELS[entry.level] < LOG_LEVELS[level]) continue;
-						if (category && entry.category !== category) continue;
-						if (since && new Date(entry.timestamp) < since) continue;
+				try {
+					const content = readFileSync(file.path, "utf-8");
+					const lines = content.trim().split("\n").filter(Boolean);
+					// Assumption: entries in each file are append-only in timestamp order.
+					// Cross-file timestamp interleaving is not supported by this tail read.
+					const recentLines = lines.slice(-(limit * 2));
 
-						results.push(entry);
-					} catch {
-						// Skip non-JSON lines
+					for (const line of recentLines) {
+						if (results.length >= limit * 2) break;
+
+						try {
+							const entry = JSON.parse(line) as LogEntry;
+
+							// Apply filters
+							if (level && LOG_LEVELS[entry.level] < LOG_LEVELS[level]) continue;
+							if (category && entry.category !== category) continue;
+							if (since && new Date(entry.timestamp) < since) continue;
+
+							results.push(entry);
+						} catch {
+							// Skip non-JSON lines
+						}
 					}
+				} catch {
+					// Skip files that can't be read
 				}
 			}
+
+			// Sort all results by timestamp (newest last for chronological order)
+			results.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 		} catch {
 			// Return empty on read error
 		}
