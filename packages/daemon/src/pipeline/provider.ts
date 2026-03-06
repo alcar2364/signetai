@@ -413,10 +413,12 @@ export function createCodexProvider(
 		}, timeoutMs);
 
 		try {
-			const stdout = await new Response(proc.stdout).text();
-			const exitCode = await proc.exited;
+			const [stdout, stderr, exitCode] = await Promise.all([
+				new Response(proc.stdout).text(),
+				new Response(proc.stderr).text(),
+				proc.exited,
+			]);
 			if (exitCode !== 0) {
-				const stderr = await new Response(proc.stderr).text();
 				throw new Error(`codex exit ${exitCode}: ${stderr.slice(0, 300)}`);
 			}
 			return parseCodexJsonl(stdout);

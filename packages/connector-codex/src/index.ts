@@ -40,11 +40,15 @@ function appendBlock(content: string): string {
 	return `${stripped}${stripped ? "\n\n" : ""}${SHELL_BLOCK}`;
 }
 
+function shellSingleQuote(value: string): string {
+	return `'${value.replace(/'/g, `'\"'\"'`)}'`;
+}
+
 function buildWrapper(realCodexBin: string): string {
 	return `#!/bin/sh
 set -eu
 
-REAL_CODEX_BIN=${JSON.stringify(realCodexBin)}
+REAL_CODEX_BIN=${shellSingleQuote(realCodexBin)}
 SIGNET_BIN="\${SIGNET_CODEX_SIGNET_BIN:-signet}"
 SESSION_ROOT="\${HOME}/.codex/sessions"
 TMP_ROOT="\${TMPDIR:-/tmp}/signet-codex-\$\$"
@@ -106,13 +110,8 @@ trap 'cleanup' EXIT
 
 session_start
 
-EXTRA_ARGS=""
-if [ -n "$INSTRUCTIONS_FILE" ]; then
-	EXTRA_ARGS="-c model_instructions_file=$INSTRUCTIONS_FILE"
-fi
-
 set +e
-if [ -n "$EXTRA_ARGS" ]; then
+if [ -n "$INSTRUCTIONS_FILE" ]; then
 	"$REAL_CODEX_BIN" -c "model_instructions_file=$INSTRUCTIONS_FILE" "$@"
 else
 	"$REAL_CODEX_BIN" "$@"
@@ -161,11 +160,11 @@ export class CodexConnector extends BaseConnector {
 		});
 		if (proc.exitCode !== 0) return null;
 
-			const candidates = proc.stdout
-				.toString()
-				.split(/\r?\n/)
-				.map((line: string) => line.trim())
-				.filter((line: string) => line.length > 0);
+		const candidates = proc.stdout
+			.toString()
+			.split(/\r?\n/)
+			.map((line: string) => line.trim())
+			.filter((line: string) => line.length > 0);
 
 		for (const candidate of candidates) {
 			if (candidate !== wrapperPath) return candidate;
