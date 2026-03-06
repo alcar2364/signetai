@@ -428,10 +428,7 @@ export function createCodexProvider(
 			}
 			return parseCodexJsonl(stdout);
 		} catch (e) {
-			if (e instanceof Error && e.message.includes("codex exit")) {
-				throw e;
-			}
-			if (e instanceof Error && e.message.includes("codex timeout")) {
+			if (timedOut) {
 				throw new Error(`codex timeout after ${timeoutMs}ms`);
 			}
 			throw e;
