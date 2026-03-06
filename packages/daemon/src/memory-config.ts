@@ -104,6 +104,14 @@ export const DEFAULT_PIPELINE_V2: PipelineV2Config = {
 		pollMs: 5000,
 		batchSize: 8,
 	},
+	synthesis: {
+		enabled: true,
+		provider: "claude-code",
+		model: "sonnet",
+		timeout: 120000,
+		maxTokens: 8000,
+		idleGapMinutes: 15,
+	},
 };
 
 export interface ResolvedMemoryConfig {
@@ -151,6 +159,7 @@ export function loadPipelineConfig(
 	const telemetryRaw = raw.telemetry as Record<string, unknown> | undefined;
 	const continuityRaw = raw.continuity as Record<string, unknown> | undefined;
 	const embeddingTrackerRaw = raw.embeddingTracker as Record<string, unknown> | undefined;
+	const synthesisRaw = raw.synthesis as Record<string, unknown> | undefined;
 
 	// Helper: resolve nested-first, flat-fallback
 	const d = DEFAULT_PIPELINE_V2;
@@ -468,6 +477,37 @@ export function loadPipelineConfig(
 				1,
 				20,
 				d.embeddingTracker.batchSize,
+			),
+		},
+
+		synthesis: {
+			enabled: resolveBool(synthesisRaw?.enabled, undefined, d.synthesis.enabled),
+			provider: (() => {
+				const p = synthesisRaw?.provider;
+				if (p === "ollama" || p === "claude-code" || p === "opencode") return p;
+				return d.synthesis.provider;
+			})(),
+			model:
+				typeof synthesisRaw?.model === "string"
+					? synthesisRaw.model
+					: d.synthesis.model,
+			timeout: clampPositive(
+				synthesisRaw?.timeout,
+				5000,
+				300000,
+				d.synthesis.timeout,
+			),
+			maxTokens: clampPositive(
+				synthesisRaw?.maxTokens ?? synthesisRaw?.max_tokens,
+				1000,
+				32000,
+				d.synthesis.maxTokens,
+			),
+			idleGapMinutes: clampPositive(
+				synthesisRaw?.idleGapMinutes,
+				1,
+				1440,
+				d.synthesis.idleGapMinutes,
 			),
 		},
 	};
