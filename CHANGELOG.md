@@ -2,6 +2,24 @@
 
 All notable changes to Signet are documented here.
 
+## [0.41.0] - 2026-03-06
+
+### Features
+
+- add native Rust vector operations with SIMD acceleration
+
+### Bug Fixes
+
+- document truncation behavior in cosine_similarity
+- address greptile round 3 feedback
+- address greptile round 2 feedback on vector ops
+- address PR review feedback on vector operations
+
+### Docs
+
+- remediate P0/P1 drift from audit (2026-03)
+
+
 ## [0.40.0] - 2026-03-06
 
 ### Features
