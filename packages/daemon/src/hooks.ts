@@ -11,7 +11,7 @@
  */
 
 import type { Database } from "bun:sqlite";
-import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { parseSimpleYaml } from "@signet/core";
@@ -67,13 +67,6 @@ export interface HooksConfig {
 		includeRecentMemories?: boolean;
 		memoryLimit?: number;
 	};
-}
-
-export interface MemorySynthesisConfig {
-	harness: string;
-	model: string;
-	schedule: "daily" | "weekly" | "on-demand";
-	max_tokens?: number;
 }
 
 export interface SynthesisRequest {
@@ -639,20 +632,7 @@ interface AgentConfig {
 	description?: string;
 }
 
-interface MemoryConfig {
-	synthesis?: {
-		harness?: string;
-		model?: string;
-		schedule?: "daily" | "weekly" | "on-demand";
-		max_tokens?: number;
-	};
-}
-
 function isAgentConfig(value: unknown): value is AgentConfig {
-	return typeof value === "object" && value !== null;
-}
-
-function isMemoryConfig(value: unknown): value is MemoryConfig {
 	return typeof value === "object" && value !== null;
 }
 
@@ -742,6 +722,52 @@ function getRecentMemories(
 		}));
 	} catch (e) {
 		logger.error("hooks", "Failed to query memories", e as Error);
+		return [];
+	}
+}
+
+/**
+ * Get memories created after a given timestamp, ordered by recency.
+ */
+function getMemoriesSince(
+	sinceMs: number,
+	limit: number,
+): Array<{
+	id: string;
+	content: string;
+	type: string;
+	importance: number;
+	created_at: string;
+}> {
+	if (!existsSync(MEMORY_DB)) return [];
+
+	try {
+		const sinceIso = new Date(sinceMs).toISOString();
+		const rows = getDbAccessor().withReadDb((db) => {
+			return db.prepare(`
+				SELECT id, content, type, importance, created_at
+				FROM memories
+				WHERE is_deleted = 0 AND created_at > ?
+				ORDER BY created_at DESC
+				LIMIT ?
+			`).all(sinceIso, limit) as Array<{
+				id: string;
+				content: string;
+				type: string;
+				importance: number;
+				created_at: string;
+			}>;
+		});
+
+		return rows.map((r) => ({
+			id: r.id,
+			content: r.content,
+			type: r.type || "general",
+			importance: r.importance || 0.5,
+			created_at: r.created_at,
+		}));
+	} catch (e) {
+		logger.error("hooks", "Failed to query memories since timestamp", e as Error);
 		return [];
 	}
 }
@@ -1591,74 +1617,98 @@ export function handleRecall(req: RecallRequest): RecallResponse {
 // Memory Synthesis
 // ============================================================================
 
-function loadSynthesisConfig(): MemorySynthesisConfig {
-	const configPath = join(AGENTS_DIR, "agent.yaml");
-
-	const defaults: MemorySynthesisConfig = {
-		harness: "openclaw",
-		model: "sonnet",
-		schedule: "daily",
-		max_tokens: 4000,
-	};
-
-	if (!existsSync(configPath)) {
-		return defaults;
+/**
+ * Write MEMORY.md with backup of previous version.
+ * Shared by the synthesis-complete endpoint and the synthesis worker.
+ */
+export function writeMemoryMd(content: string): void {
+	const memoryMdPath = join(AGENTS_DIR, "MEMORY.md");
+	if (existsSync(memoryMdPath)) {
+		const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+		const backupPath = join(AGENTS_DIR, "memory", `MEMORY.backup-${timestamp}.md`);
+		mkdirSync(join(AGENTS_DIR, "memory"), { recursive: true });
+		writeFileSync(backupPath, readFileSync(memoryMdPath, "utf-8"));
 	}
-
-	try {
-		const content = readFileSync(configPath, "utf-8");
-		const config = parseSimpleYaml(content);
-		const memory = config.memory;
-		const synthesis = isMemoryConfig(memory) ? memory.synthesis : undefined;
-
-		return {
-			harness: synthesis?.harness || defaults.harness,
-			model: synthesis?.model || defaults.model,
-			schedule: synthesis?.schedule || defaults.schedule,
-			max_tokens: synthesis?.max_tokens || defaults.max_tokens,
-		};
-	} catch {
-		return defaults;
-	}
+	const header = `<!-- generated ${new Date().toISOString().slice(0, 16).replace("T", " ")} -->\n\n`;
+	writeFileSync(memoryMdPath, header + content);
 }
 
+/**
+ * Build a synthesis prompt. When sinceTimestamp is provided, only memories
+ * created after that time are included (incremental merge). Otherwise
+ * falls back to the top 100 by importance/recency (full regeneration).
+ */
 export function handleSynthesisRequest(
 	req: SynthesisRequest,
+	opts?: { maxTokens?: number; sinceTimestamp?: number },
 ): SynthesisResponse {
-	const config = loadSynthesisConfig();
+	const maxTokens = opts?.maxTokens ?? 8000;
 
 	logger.info("hooks", "Synthesis request", { trigger: req.trigger });
 
-	const memories = getRecentMemories(100, 0.5);
+	// Read existing MEMORY.md for merge-based synthesis
+	const memoryMdPath = join(AGENTS_DIR, "MEMORY.md");
+	let existingContent = "";
+	if (existsSync(memoryMdPath)) {
+		try {
+			existingContent = readFileSync(memoryMdPath, "utf-8")
+				.replace(/^<!-- generated .* -->\n\n?/, "")
+				.trim();
+		} catch {
+			// ignore read errors
+		}
+	}
 
-	const prompt = `You are regenerating MEMORY.md - a synthesized summary of the agent's memory system.
+	const memories = opts?.sinceTimestamp
+		? getMemoriesSince(opts.sinceTimestamp, 200)
+		: getRecentMemories(100, 0.5);
 
-Review the following memories and create a coherent, organized summary that captures:
-- Current active projects and their status
-- Key decisions and their rationale
-- Important people, preferences, and relationships
-- Technical notes and learnings
-- Open threads and todos
-
-Format the output as clean markdown with clear sections. Be concise but complete.
-Maximum length: ${config.max_tokens} tokens.
-
-## Memories to Synthesize
-
-${memories.map((m) => {
+	const memoriesBlock = memories.map((m) => {
 		const dateStr = formatMemoryDate(m.created_at);
 		return `- [${m.type}] ${m.content} (${dateStr})`;
-	}).join("\n")}
-`;
+	}).join("\n");
+
+	const prompt = existingContent
+		? `You are updating MEMORY.md — a working memory summary for an AI agent.
+
+## Current MEMORY.md
+
+${existingContent}
+
+## Recent Memories
+
+${memoriesBlock}
+
+Instructions:
+- Preserve existing sections and structure
+- Update entries that have new information from recent memories
+- Add new projects, decisions, context, or technical notes that appeared
+- Remove only items that are clearly superseded or obsolete
+- Keep the document well-organized with clear sections
+- This is a working document, not a changelog — keep it current-state focused
+- Do not include a generated timestamp — that is added automatically
+- Output the full updated MEMORY.md content`
+		: `You are generating MEMORY.md — a working memory summary for an AI agent.
+
+## Memories
+
+${memoriesBlock}
+
+Instructions:
+- Create a coherent, organized summary capturing:
+  - Current active projects and their status
+  - Key decisions and their rationale
+  - Important people, preferences, and relationships
+  - Technical notes and learnings
+  - Open threads and todos
+- Format as clean markdown with clear sections
+- Be concise but complete
+- Do not include a generated timestamp — that is added automatically`;
 
 	return {
-		harness: config.harness,
-		model: config.model,
+		harness: "daemon",
+		model: "synthesis",
 		prompt,
 		memories,
 	};
-}
-
-export function getSynthesisConfig(): MemorySynthesisConfig {
-	return loadSynthesisConfig();
 }

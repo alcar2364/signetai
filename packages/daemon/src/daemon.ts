@@ -69,6 +69,7 @@ import { buildEmbeddingHealth } from "./embedding-health";
 import { type EmbeddingTrackerHandle, startEmbeddingTracker } from "./embedding-tracker";
 import { getAllFeatureFlags, initFeatureFlags } from "./feature-flags";
 import { closeLlmProvider, initLlmProvider } from "./llm";
+import { closeSynthesisProvider, initSynthesisProvider } from "./synthesis-llm";
 import { type LogEntry, logger } from "./logger";
 import { type EmbeddingConfig, loadMemoryConfig } from "./memory-config";
 import { type RecallParams, hybridRecall } from "./memory-search";
@@ -78,6 +79,8 @@ import {
 	enqueueDocumentIngestJob,
 	enqueueExtractionJob,
 	getPipelineWorkerStatus,
+	getSynthesisWorker,
+	readLastSynthesisTime,
 	startPipeline,
 	startRetentionWorker,
 	stopPipeline,
@@ -4317,7 +4320,6 @@ import {
 	type SessionStartRequest,
 	type SynthesisRequest,
 	type UserPromptSubmitRequest,
-	getSynthesisConfig,
 	handlePreCompaction,
 	handleRecall,
 	handleRemember,
@@ -4325,6 +4327,7 @@ import {
 	handleSessionStart,
 	handleSynthesisRequest,
 	handleUserPromptSubmit,
+	writeMemoryMd,
 } from "./hooks.js";
 
 import {
@@ -4609,7 +4612,7 @@ app.post("/api/hooks/compaction-complete", async (c) => {
 
 // Get synthesis config
 app.get("/api/hooks/synthesis/config", (c) => {
-	const config = getSynthesisConfig();
+	const config = loadMemoryConfig(AGENTS_DIR).pipelineV2.synthesis;
 	return c.json(config);
 });
 
@@ -4634,20 +4637,7 @@ app.post("/api/hooks/synthesis/complete", async (c) => {
 			return c.json({ error: "content is required" }, 400);
 		}
 
-		const memoryMdPath = join(AGENTS_DIR, "MEMORY.md");
-
-		// Backup existing
-		if (existsSync(memoryMdPath)) {
-			const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-			const backupPath = join(AGENTS_DIR, "memory", `MEMORY.backup-${timestamp}.md`);
-			mkdirSync(join(AGENTS_DIR, "memory"), { recursive: true });
-			writeFileSync(backupPath, readFileSync(memoryMdPath, "utf-8"));
-		}
-
-		// Write new MEMORY.md with timestamp header
-		const header = `<!-- generated ${new Date().toISOString().slice(0, 16).replace("T", " ")} -->\n\n`;
-		writeFileSync(memoryMdPath, header + body.content);
-
+		writeMemoryMd(body.content);
 		logger.info("hooks", "MEMORY.md synthesized");
 
 		return c.json({ success: true });
@@ -4655,6 +4645,33 @@ app.post("/api/hooks/synthesis/complete", async (c) => {
 		logger.error("hooks", "Synthesis complete failed", e as Error);
 		return c.json({ error: "Failed to save MEMORY.md" }, 500);
 	}
+});
+
+// Trigger immediate MEMORY.md synthesis
+app.post("/api/synthesis/trigger", async (c) => {
+	try {
+		const worker = getSynthesisWorker();
+		if (!worker) {
+			return c.json({ error: "Synthesis worker not running" }, 503);
+		}
+		const result = await worker.triggerNow();
+		return c.json(result);
+	} catch (e) {
+		logger.error("hooks", "Synthesis trigger failed", e as Error);
+		return c.json({ error: "Synthesis trigger failed" }, 500);
+	}
+});
+
+// Synthesis worker status
+app.get("/api/synthesis/status", (c) => {
+	const worker = getSynthesisWorker();
+	const config = loadMemoryConfig(AGENTS_DIR).pipelineV2.synthesis;
+	const lastRunAt = readLastSynthesisTime();
+	return c.json({
+		running: worker?.running ?? false,
+		lastRunAt: lastRunAt > 0 ? new Date(lastRunAt).toISOString() : null,
+		config,
+	});
 });
 
 // ============================================================================
@@ -7178,6 +7195,7 @@ async function cleanup() {
 	}
 
 	closeLlmProvider();
+	closeSynthesisProvider();
 	stopOpenCodeServer();
 
 	// Stop git sync timer
@@ -7310,6 +7328,48 @@ async function main() {
 						defaultTimeoutMs: memoryCfg.pipelineV2.extraction.timeout,
 					});
 	initLlmProvider(llmProvider);
+
+	// Create synthesis provider — separate from extraction because synthesis
+	// needs a smarter model that can reason across long context
+	let effectiveSynthesisProvider = memoryCfg.pipelineV2.synthesis.provider;
+	if (effectiveSynthesisProvider === "opencode") {
+		const serverReady = await ensureOpenCodeServer(4096);
+		if (!serverReady) {
+			logger.warn("config", "OpenCode server not available for synthesis, falling back to ollama");
+			effectiveSynthesisProvider = "ollama";
+		}
+	} else if (effectiveSynthesisProvider === "claude-code") {
+		try {
+			const proc = Bun.spawn(["claude", "--version"], {
+				stdout: "pipe",
+				stderr: "pipe",
+				env: { ...process.env, SIGNET_NO_HOOKS: "1" },
+			});
+			const exitCode = await proc.exited;
+			if (exitCode !== 0) throw new Error("non-zero exit");
+		} catch {
+			logger.warn("config", "Claude Code CLI not found, falling back to ollama for synthesis");
+			effectiveSynthesisProvider = "ollama";
+		}
+	}
+	logger.info("config", "Synthesis provider", { provider: effectiveSynthesisProvider });
+
+	const synthesisProvider =
+		effectiveSynthesisProvider === "opencode"
+			? createOpenCodeProvider({
+					model: memoryCfg.pipelineV2.synthesis.model || "anthropic/claude-haiku-4-5-20251001",
+					defaultTimeoutMs: memoryCfg.pipelineV2.synthesis.timeout,
+				})
+			: effectiveSynthesisProvider === "claude-code"
+				? createClaudeCodeProvider({
+						model: memoryCfg.pipelineV2.synthesis.model || "sonnet",
+						defaultTimeoutMs: memoryCfg.pipelineV2.synthesis.timeout,
+					})
+				: createOllamaProvider({
+						model: memoryCfg.pipelineV2.synthesis.model || "qwen3:4b",
+						defaultTimeoutMs: memoryCfg.pipelineV2.synthesis.timeout,
+					});
+	initSynthesisProvider(synthesisProvider);
 
 	// Telemetry collector (opt-in, anonymous)
 	let telemetryCollector: TelemetryCollector | undefined;

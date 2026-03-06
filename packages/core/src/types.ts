@@ -231,12 +231,21 @@ export interface PipelineV2Config {
 	readonly telemetry: PipelineTelemetryConfig;
 	readonly continuity: PipelineContinuityConfig;
 	readonly embeddingTracker: PipelineEmbeddingTrackerConfig;
+	readonly synthesis: PipelineSynthesisConfig;
 }
 
 export interface PipelineEmbeddingTrackerConfig {
 	readonly enabled: boolean;
 	readonly pollMs: number;
 	readonly batchSize: number;
+}
+
+export interface PipelineSynthesisConfig {
+	readonly provider: "ollama" | "claude-code" | "opencode";
+	readonly model: string;
+	readonly timeout: number;
+	readonly maxTokens: number;
+	readonly idleGapMinutes: number;
 }
 
 // -- Status/union constants --

@@ -31,8 +31,13 @@ export type { RetentionHandle, RetentionConfig } from "./retention-worker";
 export type { MaintenanceHandle } from "./maintenance-worker";
 export { startSummaryWorker, enqueueSummaryJob } from "./summary-worker";
 export type { SummaryWorkerHandle } from "./summary-worker";
-export { startSynthesisWorker } from "./synthesis-worker";
+export { startSynthesisWorker, readLastSynthesisTime } from "./synthesis-worker";
 export type { SynthesisWorkerHandle } from "./synthesis-worker";
+
+/** Get the active synthesis worker handle (for API routes). */
+export function getSynthesisWorker(): SynthesisWorkerHandle | null {
+	return synthesisWorkerHandle;
+}
 
 // ---------------------------------------------------------------------------
 // Singleton state
@@ -112,9 +117,9 @@ export function startPipeline(
 		summaryWorkerHandle = startSummaryWorker(accessor);
 	}
 
-	// Synthesis worker — periodic MEMORY.md regeneration
+	// Synthesis worker — session-activity-based MEMORY.md regeneration
 	if (!synthesisWorkerHandle) {
-		synthesisWorkerHandle = startSynthesisWorker();
+		synthesisWorkerHandle = startSynthesisWorker(pipelineCfg.synthesis);
 	}
 
 	logger.info("pipeline", "Pipeline started", {

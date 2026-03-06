@@ -1,38 +1,40 @@
 /**
- * Synthesis worker: periodic MEMORY.md regeneration.
+ * Synthesis worker: session-activity-based MEMORY.md regeneration.
  *
- * Reads the synthesis schedule from agent.yaml, calls the daemon's own
- * LLM provider to summarize recent memories, and writes the result to
- * MEMORY.md via the existing synthesis-complete logic.
+ * Instead of fixed daily/weekly schedules, this worker monitors session
+ * activity and triggers synthesis after an idle gap — when the user has
+ * stopped using sessions for a configurable number of minutes.
  *
- * This closes the loop that previously required an external harness
- * (OpenClaw, Claude Code) to drive the two-step synthesis hook.
+ * Uses a dedicated synthesis LLM provider (separate from extraction)
+ * because synthesis needs a smarter model that can reason across long
+ * context, whereas extraction uses tiny local models for tagging.
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { type MemorySynthesisConfig, getSynthesisConfig, handleSynthesisRequest } from "../hooks";
-import { getLlmProvider } from "../llm";
+import type { PipelineSynthesisConfig } from "../memory-config";
+import { handleSynthesisRequest, writeMemoryMd } from "../hooks";
+import { getSynthesisProvider } from "../synthesis-llm";
 import { logger } from "../logger";
+import { getDbAccessor } from "../db-accessor";
+import { activeSessionCount } from "../session-tracker";
 import { generateWithTracking } from "./provider";
 
-const AGENTS_DIR = join(homedir(), ".agents");
+const AGENTS_DIR = process.env.SIGNET_PATH || join(homedir(), ".agents");
 
 // ---------------------------------------------------------------------------
-// Schedule helpers
+// Constants
 // ---------------------------------------------------------------------------
 
-const SCHEDULE_INTERVALS: Record<string, number> = {
-	daily: 24 * 60 * 60 * 1000,
-	weekly: 7 * 24 * 60 * 60 * 1000,
-};
-
-/** Check interval — how often we check if synthesis is due (5 min). */
-const CHECK_INTERVAL_MS = 5 * 60 * 1000;
+/** How often the worker checks if synthesis is due (60s). */
+const CHECK_INTERVAL_MS = 60_000;
 
 /** Minimum time between syntheses to avoid rapid re-runs (1 hour). */
 const MIN_INTERVAL_MS = 60 * 60 * 1000;
+
+/** Initial delay after daemon start before first check (60s). */
+const STARTUP_DELAY_MS = 60_000;
 
 // ---------------------------------------------------------------------------
 // Timestamp persistence
@@ -42,7 +44,7 @@ function getLastSynthesisPath(): string {
 	return join(AGENTS_DIR, ".daemon", "last-synthesis.json");
 }
 
-function readLastSynthesisTime(): number {
+export function readLastSynthesisTime(): number {
 	try {
 		const path = getLastSynthesisPath();
 		if (!existsSync(path)) return 0;
@@ -66,29 +68,61 @@ function writeLastSynthesisTime(timestamp: number): void {
 }
 
 // ---------------------------------------------------------------------------
+// Session activity detection
+// ---------------------------------------------------------------------------
+
+/**
+ * Get the timestamp of the most recent session end from checkpoints.
+ * Returns 0 if no session-end checkpoints exist.
+ */
+function getLastSessionEndTime(): number {
+	try {
+		const row = getDbAccessor().withReadDb((db) => {
+			return db.prepare(`
+				SELECT MAX(created_at) as last_end
+				FROM session_checkpoints
+				WHERE trigger = 'session_end'
+			`).get() as { last_end: string | null } | undefined;
+		});
+		if (!row?.last_end) return 0;
+		return new Date(row.last_end).getTime();
+	} catch {
+		return 0;
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Core synthesis execution
 // ---------------------------------------------------------------------------
 
-async function runSynthesis(config: MemorySynthesisConfig): Promise<boolean> {
+async function runSynthesis(config: PipelineSynthesisConfig): Promise<boolean> {
 	logger.info("synthesis", "Starting scheduled synthesis", {
+		provider: config.provider,
 		model: config.model,
-		schedule: config.schedule,
 	});
 
 	try {
-		// Step 1: Get the synthesis prompt with memories
-		const synthesisData = handleSynthesisRequest({ trigger: "scheduled" });
+		const lastRun = readLastSynthesisTime();
+
+		// Build prompt — pass sinceTimestamp for incremental merge
+		const synthesisData = handleSynthesisRequest(
+			{ trigger: "scheduled" },
+			{
+				maxTokens: config.maxTokens,
+				sinceTimestamp: lastRun > 0 ? lastRun : undefined,
+			},
+		);
 
 		if (synthesisData.memories.length === 0) {
 			logger.info("synthesis", "No memories to synthesize, skipping");
 			return true;
 		}
 
-		// Step 2: Call LLM to generate the summary
-		const provider = getLlmProvider();
+		// Call the synthesis-specific LLM provider
+		const provider = getSynthesisProvider();
 		const result = await generateWithTracking(provider, synthesisData.prompt, {
-			maxTokens: config.max_tokens ?? 4000,
-			timeoutMs: 120_000,
+			maxTokens: config.maxTokens,
+			timeoutMs: config.timeout,
 		});
 
 		if (!result.text || result.text.trim().length === 0) {
@@ -96,20 +130,8 @@ async function runSynthesis(config: MemorySynthesisConfig): Promise<boolean> {
 			return false;
 		}
 
-		// Step 3: Write MEMORY.md (same logic as synthesis-complete endpoint)
-		const memoryMdPath = join(AGENTS_DIR, "MEMORY.md");
-
-		// Backup existing
-		if (existsSync(memoryMdPath)) {
-			const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-			const backupPath = join(AGENTS_DIR, "memory", `MEMORY.backup-${timestamp}.md`);
-			mkdirSync(join(AGENTS_DIR, "memory"), { recursive: true });
-			writeFileSync(backupPath, readFileSync(memoryMdPath, "utf-8"));
-		}
-
-		// Write new MEMORY.md
-		const header = `<!-- generated ${new Date().toISOString().slice(0, 16).replace("T", " ")} -->\n\n`;
-		writeFileSync(memoryMdPath, header + result.text);
+		// Write MEMORY.md via shared helper (handles backup)
+		writeMemoryMd(result.text);
 
 		logger.info("synthesis", "MEMORY.md synthesized", {
 			memories: synthesisData.memories.length,
@@ -137,31 +159,54 @@ export interface SynthesisWorkerHandle {
 	stop(): void;
 	readonly running: boolean;
 	/** Trigger an immediate synthesis (e.g. from API). */
-	triggerNow(): Promise<boolean>;
+	triggerNow(): Promise<{ success: boolean; skipped: boolean; reason?: string }>;
+	/** Last synthesis timestamp. */
+	readonly lastRunAt: number;
 }
 
-export function startSynthesisWorker(): SynthesisWorkerHandle {
+export function startSynthesisWorker(
+	config: PipelineSynthesisConfig,
+): SynthesisWorkerHandle {
 	let timer: ReturnType<typeof setTimeout> | null = null;
 	let stopped = false;
+	const idleGapMs = config.idleGapMinutes * 60 * 1000;
 
 	async function tick(): Promise<void> {
 		if (stopped) return;
 
 		try {
-			const config = getSynthesisConfig();
-
-			// "on-demand" means never auto-run
-			if (config.schedule === "on-demand") {
+			// Don't synthesize while sessions are active
+			if (activeSessionCount() > 0) {
 				scheduleTick(CHECK_INTERVAL_MS);
 				return;
 			}
 
-			const interval = SCHEDULE_INTERVALS[config.schedule] ?? SCHEDULE_INTERVALS.daily;
-			const lastRun = readLastSynthesisTime();
-			const elapsed = Date.now() - lastRun;
+			// Check when the last session ended
+			const lastSessionEnd = getLastSessionEndTime();
+			if (lastSessionEnd === 0) {
+				// No session-end checkpoints yet — nothing to synthesize from
+				scheduleTick(CHECK_INTERVAL_MS);
+				return;
+			}
 
-			if (elapsed < interval) {
-				// Not due yet
+			const idleSince = Date.now() - lastSessionEnd;
+			if (idleSince < idleGapMs) {
+				// Not idle long enough
+				scheduleTick(CHECK_INTERVAL_MS);
+				return;
+			}
+
+			// Check if we already synthesized since the last session ended
+			const lastRun = readLastSynthesisTime();
+			if (lastRun >= lastSessionEnd) {
+				// Already synthesized after the most recent session
+				scheduleTick(CHECK_INTERVAL_MS);
+				return;
+			}
+
+			// Enforce minimum interval
+			const elapsed = Date.now() - lastRun;
+			if (elapsed < MIN_INTERVAL_MS) {
 				scheduleTick(CHECK_INTERVAL_MS);
 				return;
 			}
@@ -186,10 +231,14 @@ export function startSynthesisWorker(): SynthesisWorkerHandle {
 		}, delay);
 	}
 
-	// Initial delay: 60s after daemon start to let other workers settle
-	scheduleTick(60_000);
+	// Initial delay to let other workers settle
+	scheduleTick(STARTUP_DELAY_MS);
 
-	logger.info("synthesis", "Synthesis worker started");
+	logger.info("synthesis", "Synthesis worker started", {
+		provider: config.provider,
+		model: config.model,
+		idleGapMinutes: config.idleGapMinutes,
+	});
 
 	return {
 		stop() {
@@ -200,24 +249,24 @@ export function startSynthesisWorker(): SynthesisWorkerHandle {
 		get running() {
 			return !stopped;
 		},
-		async triggerNow(): Promise<boolean> {
-			const config = getSynthesisConfig();
+		get lastRunAt() {
+			return readLastSynthesisTime();
+		},
+		async triggerNow() {
 			const lastRun = readLastSynthesisTime();
 			const elapsed = Date.now() - lastRun;
 
 			if (elapsed < MIN_INTERVAL_MS) {
-				logger.info("synthesis", "Skipping manual trigger — too recent", {
-					elapsedMs: elapsed,
-					minIntervalMs: MIN_INTERVAL_MS,
-				});
-				return false;
+				const reason = `Too recent — last run ${Math.round(elapsed / 60000)}m ago, minimum is ${Math.round(MIN_INTERVAL_MS / 60000)}m`;
+				logger.info("synthesis", "Skipping manual trigger", { reason });
+				return { success: false, skipped: true, reason };
 			}
 
 			const success = await runSynthesis(config);
 			if (success) {
 				writeLastSynthesisTime(Date.now());
 			}
-			return success;
+			return { success, skipped: false };
 		},
 	};
 }

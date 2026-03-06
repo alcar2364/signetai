@@ -24,7 +24,6 @@ const {
 	handleRemember,
 	handleRecall,
 	handleSessionEnd,
-	getSynthesisConfig,
 	effectiveScore,
 	selectWithBudget,
 	isDuplicate,
@@ -958,7 +957,7 @@ describe("handleSessionEnd", () => {
 // ============================================================================
 
 describe("handleSynthesisRequest", () => {
-	test("returns synthesis config and prompt", () => {
+	test("returns prompt with memories", () => {
 		createMemoryDb([
 			{
 				content: "User likes Bun",
@@ -969,63 +968,31 @@ describe("handleSynthesisRequest", () => {
 
 		const result = handleSynthesisRequest({ trigger: "manual" });
 
-		expect(result.harness).toBe("openclaw");
-		expect(result.model).toBe("sonnet");
-		expect(result.prompt).toContain("regenerating MEMORY.md");
+		expect(result.harness).toBe("daemon");
+		expect(result.model).toBe("synthesis");
+		expect(result.prompt).toContain("MEMORY.md");
 		expect(result.memories.length).toBe(1);
 		expect(result.memories[0].content).toBe("User likes Bun");
 	});
 
-	test("uses config from agent.yaml", () => {
-		writeAgentYaml(`
-memory:
-  synthesis:
-    harness: claude-code
-    model: opus
-    schedule: weekly
-    max_tokens: 2000
-`);
-
-		createMemoryDb([]);
+	test("generates fresh prompt when no existing MEMORY.md", () => {
+		createMemoryDb([
+			{
+				content: "Test memory",
+				type: "fact",
+				importance: 0.5,
+			},
+		]);
 
 		const result = handleSynthesisRequest({ trigger: "scheduled" });
 
-		expect(result.harness).toBe("claude-code");
-		expect(result.model).toBe("opus");
-		expect(result.prompt).toContain("2000 tokens");
+		expect(result.prompt).toContain("generating MEMORY.md");
+		expect(result.prompt).toContain("Test memory");
 	});
 
 	test("returns empty memories when no database", () => {
 		const result = handleSynthesisRequest({ trigger: "manual" });
 		expect(result.memories).toEqual([]);
-	});
-});
-
-// ============================================================================
-// getSynthesisConfig
-// ============================================================================
-
-describe("getSynthesisConfig", () => {
-	test("returns defaults when no config file", () => {
-		const config = getSynthesisConfig();
-
-		expect(config.harness).toBe("openclaw");
-		expect(config.model).toBe("sonnet");
-		expect(config.schedule).toBe("daily");
-		expect(config.max_tokens).toBe(4000);
-	});
-
-	test("merges config from agent.yaml", () => {
-		writeAgentYaml(`
-memory:
-  synthesis:
-    model: haiku
-`);
-
-		const config = getSynthesisConfig();
-
-		expect(config.model).toBe("haiku");
-		expect(config.harness).toBe("openclaw");
 	});
 });
 
