@@ -408,7 +408,9 @@ export function createCodexProvider(
 			},
 		});
 
+		let timedOut = false;
 		const timer = setTimeout(() => {
+			timedOut = true;
 			proc.kill();
 		}, timeoutMs);
 
@@ -418,6 +420,9 @@ export function createCodexProvider(
 				new Response(proc.stderr).text(),
 				proc.exited,
 			]);
+			if (timedOut) {
+				throw new Error(`codex timeout after ${timeoutMs}ms`);
+			}
 			if (exitCode !== 0) {
 				throw new Error(`codex exit ${exitCode}: ${stderr.slice(0, 300)}`);
 			}
@@ -426,7 +431,7 @@ export function createCodexProvider(
 			if (e instanceof Error && e.message.includes("codex exit")) {
 				throw e;
 			}
-			if (e instanceof Error && e.message.includes("SIGTERM")) {
+			if (e instanceof Error && e.message.includes("codex timeout")) {
 				throw new Error(`codex timeout after ${timeoutMs}ms`);
 			}
 			throw e;

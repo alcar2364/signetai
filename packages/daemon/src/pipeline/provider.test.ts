@@ -207,6 +207,30 @@ describe("createCodexProvider", () => {
 		const provider = createCodexProvider({ model: "gpt-5.3-codex" });
 		await expect(provider.generate("test")).rejects.toThrow(/codex exit 1/);
 	});
+
+	it("generate() reports timeout when kill triggers a non-zero exit", async () => {
+		Bun.spawn = mock((_args: string[]) => {
+			let resolveExit!: (code: number) => void;
+			const exited = new Promise<number>((resolve) => {
+				resolveExit = resolve;
+			});
+
+			return {
+				stdout: streamFromString(""),
+				stderr: streamFromString("timed out"),
+				exited,
+				kill() {
+					resolveExit(143);
+				},
+			};
+		}) as typeof Bun.spawn;
+
+		const provider = createCodexProvider({
+			model: "gpt-5.3-codex",
+			defaultTimeoutMs: 1,
+		});
+		await expect(provider.generate("test")).rejects.toThrow(/codex timeout after 1ms/);
+	});
 });
 
 // ---------------------------------------------------------------------------
