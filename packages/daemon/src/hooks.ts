@@ -11,7 +11,7 @@
  */
 
 import type { Database } from "bun:sqlite";
-import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { parseSimpleYaml } from "@signet/core";
@@ -1781,13 +1781,16 @@ export function handleSynthesisRequest(
 		}
 	}
 
-	// Collect file contents up to char budget
+	// Collect file contents up to char budget, skipping files older than sinceTimestamp
+	const sinceMs = opts?.sinceTimestamp ?? 0;
 	const sessionBlocks: string[] = [];
 	let cumChars = 0;
 	for (const file of sessionFiles) {
 		if (cumChars >= charBudget) break;
 		try {
-			const content = readFileSync(join(memoryDir, file), "utf-8").trim();
+			const filePath = join(memoryDir, file);
+			if (sinceMs > 0 && statSync(filePath).mtimeMs < sinceMs) continue;
+			const content = readFileSync(filePath, "utf-8").trim();
 			if (content.length === 0) continue;
 			sessionBlocks.push(content);
 			cumChars += content.length;
