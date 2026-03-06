@@ -15,8 +15,8 @@
     "triples": {}
   },
   "scripts": {
-    "build": "napi build --release --platform",
-    "build:debug": "napi build --platform"
+    "build": "cp index.d.ts index.d.ts.bak && napi build --release --platform && mv index.d.ts.bak index.d.ts",
+    "build:debug": "cp index.d.ts index.d.ts.bak && napi build --platform && mv index.d.ts.bak index.d.ts"
   },
   "devDependencies": {
     "@napi-rs/cli": "^3.5.1"

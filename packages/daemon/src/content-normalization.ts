@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { createRequire } from "node:module";
 
 export interface NormalizedMemoryContent {
 	readonly storageContent: string;
@@ -10,7 +11,8 @@ export interface NormalizedMemoryContent {
 // Try to load native Rust implementation, fall back to pure TS
 let native: typeof import("@signet/native") | null = null;
 try {
-	native = require("@signet/native");
+	const esmRequire = createRequire(import.meta.url);
+	native = esmRequire("@signet/native");
 } catch {
 	// Native addon not available — using TypeScript fallback
 }

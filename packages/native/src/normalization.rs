@@ -1,6 +1,8 @@
 use napi_derive::napi;
 use sha2::{Digest, Sha256};
 
+// napi(object) converts snake_case fields to camelCase in JS:
+// storage_content -> storageContent, etc.
 #[napi(object)]
 pub struct NormalizedMemoryContent {
     pub storage_content: String,

@@ -16,7 +16,7 @@
   ],
   "scripts": {
     "build": "bun run build:core && bun run build:connector-base && bun run build:opencode-plugin && bun run build:native && bun run build:deps && bun run build:signetai",
-    "build:native": "cd packages/native && cargo --version >/dev/null 2>&1 && bun run build || echo '[signet] skipping native build (rust not installed)'",
+    "build:native": "cd packages/native && (cargo --version >/dev/null 2>&1 || (echo '[signet] skipping native build (rust not installed)' && exit 0)) && bun run build",
     "build:core": "cd packages/core && bun run build",
     "build:connector-base": "cd packages/connector-base && bun run build",
     "build:opencode-plugin": "cd packages/opencode-plugin && bun run build",
