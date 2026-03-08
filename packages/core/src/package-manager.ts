@@ -66,7 +66,7 @@ export function parsePackageManagerUserAgent(
 
 function defaultCommandExists(command: string): boolean {
 	try {
-		const result = spawnSync(command, ["--version"], { stdio: "ignore" });
+		const result = spawnSync(command, ["--version"], { stdio: "ignore", windowsHide: true });
 		return result.status === 0;
 	} catch {
 		return false;
@@ -160,7 +160,7 @@ export function resolvePrimaryPackageManager(
 		options.execPath ?? (typeof process !== "undefined" ? process.argv[0] : undefined);
 	if (!detectFromExecPath(execPathForDetection)) {
 		try {
-			const result = spawnSync("which", ["signet"], { encoding: "utf-8" });
+			const result = spawnSync("which", ["signet"], { encoding: "utf-8", windowsHide: true });
 			if (result.status === 0 && result.stdout.trim()) {
 				execPathForDetection = result.stdout.trim();
 			}

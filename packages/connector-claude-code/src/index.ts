@@ -284,6 +284,19 @@ export class ClaudeCodeConnector extends BaseConnector {
 			sessionEnd: true,
 		};
 
+		// On Windows, bypass the .cmd wrapper which flashes a console window.
+		// Invoke node with the signet.js entry point directly instead.
+		let signetCmd = "signet";
+		if (process.platform === "win32") {
+			// process.argv[1] is the CLI entry point (e.g. .../signetai/dist/cli.js).
+			// Navigate up to the package root and into bin/signet.js.
+			const cliEntry = process.argv[1] || "";
+			const signetJs = join(cliEntry, "..", "..", "bin", "signet.js");
+			if (existsSync(signetJs)) {
+				signetCmd = `node "${signetJs}"`;
+			}
+		}
+
 		const hooks: Record<string, unknown[]> = {};
 
 		if (hooksConfig.sessionStart !== false) {
@@ -293,7 +306,7 @@ export class ClaudeCodeConnector extends BaseConnector {
 						{
 							type: "command",
 							command:
-								'signet hook session-start -H claude-code --project "$(pwd)"',
+								`${signetCmd} hook session-start -H claude-code --project "$(pwd)"`,
 							timeout: 3000,
 						},
 					],
@@ -308,7 +321,7 @@ export class ClaudeCodeConnector extends BaseConnector {
 						{
 							type: "command",
 							command:
-								'signet hook user-prompt-submit -H claude-code --project "$(pwd)"',
+								`${signetCmd} hook user-prompt-submit -H claude-code --project "$(pwd)"`,
 							timeout: 2000,
 						},
 					],
@@ -323,7 +336,7 @@ export class ClaudeCodeConnector extends BaseConnector {
 						{
 							type: "command",
 							command:
-								'signet hook pre-compaction -H claude-code --project "$(pwd)"',
+								`${signetCmd} hook pre-compaction -H claude-code --project "$(pwd)"`,
 							timeout: 3000,
 						},
 					],
@@ -337,7 +350,7 @@ export class ClaudeCodeConnector extends BaseConnector {
 					hooks: [
 						{
 							type: "command",
-							command: "signet hook session-end -H claude-code",
+							command: `${signetCmd} hook session-end -H claude-code`,
 							timeout: 15000,
 						},
 					],

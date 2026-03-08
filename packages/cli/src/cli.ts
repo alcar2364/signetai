@@ -183,7 +183,7 @@ function isGitRepo(dir: string): boolean {
 
 async function gitInit(dir: string): Promise<boolean> {
 	return new Promise((resolve) => {
-		const proc = spawn("git", ["init"], { cwd: dir, stdio: "pipe" });
+		const proc = spawn("git", ["init"], { cwd: dir, stdio: "pipe", windowsHide: true });
 		proc.on("close", (code) => resolve(code === 0));
 		proc.on("error", () => resolve(false));
 	});
@@ -192,7 +192,7 @@ async function gitInit(dir: string): Promise<boolean> {
 async function gitAddAndCommit(dir: string, message: string): Promise<boolean> {
 	return new Promise((resolve) => {
 		// First, git add -A
-		const add = spawn("git", ["add", "-A"], { cwd: dir, stdio: "pipe" });
+		const add = spawn("git", ["add", "-A"], { cwd: dir, stdio: "pipe", windowsHide: true });
 		add.on("close", (addCode) => {
 			if (addCode !== 0) {
 				resolve(false);
@@ -202,6 +202,7 @@ async function gitAddAndCommit(dir: string, message: string): Promise<boolean> {
 			const status = spawn("git", ["status", "--porcelain"], {
 				cwd: dir,
 				stdio: "pipe",
+				windowsHide: true,
 			});
 			let statusOutput = "";
 			status.stdout?.on("data", (d) => {
@@ -217,6 +218,7 @@ async function gitAddAndCommit(dir: string, message: string): Promise<boolean> {
 				const commit = spawn("git", ["commit", "-m", message], {
 					cwd: dir,
 					stdio: "pipe",
+					windowsHide: true,
 				});
 				commit.on("close", (commitCode) => resolve(commitCode === 0));
 				commit.on("error", () => resolve(false));
@@ -371,6 +373,7 @@ async function startDaemon(agentsDir: string = AGENTS_DIR): Promise<boolean> {
 	const proc = spawn(runtime, [daemonPath], {
 		detached: true,
 		stdio: "ignore",
+		windowsHide: true,
 		env: {
 			...process.env,
 			SIGNET_PORT: DEFAULT_PORT.toString(),
@@ -951,6 +954,7 @@ async function runCommandWithOutput(
 			cwd: options?.cwd,
 			env: options?.env,
 			timeout: options?.timeout,
+			windowsHide: true,
 		});
 
 		let stdout = "";
@@ -4294,6 +4298,7 @@ skillCmd
 				const proc = spawn(skillsCommand.command, skillsCommand.args, {
 					stdio: ["ignore", "pipe", "pipe"],
 					env: { ...process.env },
+					windowsHide: true,
 				});
 
 				let stderr = "";
