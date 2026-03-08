@@ -2,6 +2,45 @@
 
 All notable changes to Signet are documented here.
 
+## [0.45.2] - 2026-03-08
+
+### Features
+
+- **daemon**: add cross-agent messaging and ACP relay
+
+### Bug Fixes
+
+- **daemon**: scope cross-agent SSE presence by project
+- **daemon**: harden cross-agent prompt and routing safety
+- **daemon**: harden cross-agent auth and ACP relay
+
+
+## [0.45.1] - 2026-03-08
+
+### Bug Fixes
+
+- **dashboard**: address PR review feedback on page shell decomposition
+
+### Refactoring
+
+- **dashboard**: decompose +page.svelte into focused layout components
+
+
+## [0.45.0] - 2026-03-08
+
+### Bug Fixes
+
+- **release**: rebase before version bump, undraft before npm publish
+- **predictor**: address PR review feedback before merge
+- **predictor**: fix binary name, config fallback, and redirect guard
+- **predictor**: distribute binary, enable by default, fix traversal cache bug
+
+### Docs
+
+- delete duplicates
+- add frontmatter to docs missing metadata
+
+
 ## [0.44.0] - 2026-03-08
 
 ### Features

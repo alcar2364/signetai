@@ -1675,12 +1675,12 @@ List all active sessions with their bypass status.
   "sessions": [
     {
       "key": "session-uuid",
-      "harness": "claude-code",
       "runtimePath": "plugin",
-      "startedAt": "2026-03-08T10:00:00.000Z",
-      "bypass": false
+      "claimedAt": "2026-03-08T10:00:00.000Z",
+      "bypassed": false
     }
-  ]
+  ],
+  "count": 1
 }
 ```
 
@@ -1693,10 +1693,9 @@ Get a single session's status by its session key.
 ```json
 {
   "key": "session-uuid",
-  "harness": "claude-code",
   "runtimePath": "plugin",
-  "startedAt": "2026-03-08T10:00:00.000Z",
-  "bypass": false
+  "claimedAt": "2026-03-08T10:00:00.000Z",
+  "bypassed": false
 }
 ```
 
@@ -1715,14 +1714,14 @@ return empty no-op responses with `bypassed: true`. MCP tools are not affected.
 }
 ```
 
-`enabled` is required.
+`enabled` is required (boolean).
 
 **Response**
 
 ```json
 {
   "key": "session-uuid",
-  "bypass": true
+  "bypassed": true
 }
 ```
 

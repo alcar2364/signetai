@@ -123,8 +123,10 @@ export function bypassSession(sessionKey: string): boolean {
 
 /** Disable bypass for a session — hooks resume normal behavior. */
 export function unbypassSession(sessionKey: string): void {
-	bypassedSessions.delete(sessionKey);
-	logger.info("session-tracker", "Session bypass removed", { sessionKey });
+	const removed = bypassedSessions.delete(sessionKey);
+	if (removed) {
+		logger.info("session-tracker", "Session bypass removed", { sessionKey });
+	}
 }
 
 /** Check whether a session is currently bypassed. */

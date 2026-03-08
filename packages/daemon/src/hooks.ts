@@ -17,6 +17,7 @@ import { join } from "node:path";
 import { parseSimpleYaml } from "@signet/core";
 import { logger } from "./logger";
 import { getDbAccessor } from "./db-accessor";
+import { listAgentPresence } from "./cross-agent";
 import { fetchEmbedding } from "./embedding-fetch";
 import { hybridRecall } from "./memory-search";
 import { enqueueSummaryJob } from "./pipeline/summary-worker";
@@ -88,6 +89,31 @@ export function resetPromptDedup(sessionKey: string): void {
 function formatMemoryDate(isoDate: string): string {
 	const d = new Date(isoDate);
 	return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function formatLastSeenShort(isoDate: string): string {
+	const seenAt = Date.parse(isoDate);
+	if (!Number.isFinite(seenAt)) return "unknown";
+	const deltaMs = Date.now() - seenAt;
+	if (deltaMs < 60_000) return "just now";
+	const minutes = Math.floor(deltaMs / 60_000);
+	if (minutes < 60) return `${minutes}m ago`;
+	const hours = Math.floor(minutes / 60);
+	if (hours < 24) return `${hours}h ago`;
+	const days = Math.floor(hours / 24);
+	return `${days}d ago`;
+}
+
+function harnessSupportsNamedCrossAgentTools(harness: string): boolean {
+	return harness.trim().toLowerCase() === "codex";
+}
+
+function sanitizePeerPromptField(value: string | undefined): string {
+	if (!value) return "";
+	return value
+		.replace(/[\r\n`*#[\]<>]/g, " ")
+		.replace(/\s+/g, " ")
+		.trim();
 }
 
 // ============================================================================
@@ -164,6 +190,7 @@ export interface PreCompactionResponse {
 export interface UserPromptSubmitRequest {
 	harness: string;
 	project?: string;
+	agentId?: string;
 	/** Pre-cleaned user message (preferred — used as-is after metadata strip). */
 	userMessage?: string;
 	/** Raw user prompt (legacy — metadata stripped before use). */
@@ -1284,6 +1311,34 @@ export async function handleSessionStart(req: SessionStartRequest): Promise<Sess
 		timeStyle: "short",
 	});
 	injectParts.push(`\n# Current Date & Time\n${now} (${tz})\n`);
+
+	if (req.project) {
+		const peerSessions = listAgentPresence({
+			agentId: req.agentId ?? "default",
+			sessionKey: req.sessionKey,
+			project: req.project,
+			includeSelf: false,
+			limit: 6,
+		});
+		if (peerSessions.length > 0) {
+			injectParts.push("\n## Active Peer Sessions\n");
+			injectParts.push("Other Signet agent sessions are active right now:");
+			for (const peer of peerSessions) {
+				const safeAgentId = sanitizePeerPromptField(peer.agentId) || "unknown-agent";
+				const safeHarness = sanitizePeerPromptField(peer.harness) || "unknown-harness";
+				const safeSessionKey = sanitizePeerPromptField(peer.sessionKey);
+				const safeProject = sanitizePeerPromptField(peer.project);
+				const sessionLabel = safeSessionKey ? ` session=${safeSessionKey}` : "";
+				const projectLabel = safeProject ? ` project=${safeProject}` : "";
+				injectParts.push(
+					`- ${safeAgentId} (${safeHarness})${projectLabel}${sessionLabel} [seen ${formatLastSeenShort(peer.lastSeenAt)}]`,
+				);
+			}
+			if (harnessSupportsNamedCrossAgentTools(req.harness)) {
+				injectParts.push("Use `agent_message_send` to ask for help and `agent_message_inbox` to read replies.");
+			}
+		}
+	}
 
 	if (agentsMdContent) {
 		injectParts.push("\n## Agent Instructions\n");
