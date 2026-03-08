@@ -2,6 +2,75 @@
 
 All notable changes to Signet are documented here.
 
+## [0.44.0] - 2026-03-08
+
+### Features
+
+- **dashboard**: add Home tab as default landing page
+- **dashboard**: add Updates tab for roadmap and changelog
+- **dashboard**: add knowledge graph overlay to constellation view
+- **mcp**: register memory_feedback tool in MCP server
+- **predictor**: agent feedback, training telemetry, and theory tests
+- knowledge architecture KA-2 — two-pass structural assignment pipeline
+- knowledge architecture KA-1 — schema, types, and graph helpers
+- procedural memory P1 — skill_meta, enrichment, graph nodes, reconciler
+
+### Bug Fixes
+
+- **runtime**: ignore generated memory artifacts and rebuild core on start
+- **predictor**: harden sidecar status and dashboard hot paths
+- **dashboard**: fix broken predictor tab — double-portal, fetch mutex, config persistence
+- **dashboard**: rework project docs navigation
+- **upgrade**: harden upgrade path for total-recall merge
+- **embedding**: add warn logging for silent embedding failures
+- **provider**: track timeout flag in claude-code provider
+- **search**: sanitize FTS5 keyword queries to prevent syntax errors
+- **reconciler**: handle entities.name UNIQUE constraint collision
+- **config**: enforce minAspectWeight <= maxAspectWeight
+- **predictor**: add drift detection corrective actions and RFC 4180 CSV export
+- **predictor**: use 17-element feature vectors matching sidecar contract
+- **dashboard**: resolve 4 constellation view bugs from dogfood report
+- **dashboard**: budget hierarchy and dependency edges in constellation renderer
+- **knowledge-graph**: address three bugs found in review
+- **knowledge-graph**: prune entity bloat and fix hierarchy inversion
+- **hooks**: cap assistant term budget and preserve hyphenated identifiers
+- **hooks**: prevent recall query pollution from assistant messages and metadata
+- **hooks**: deduplicate session-start and prompt-submit token injection
+- **openclaw**: strip metadata JSON envelope from user messages
+- **build**: use hoisted linker for workspace symlink resolution
+- **pipeline**: decouple structural classification from new fact writes
+- **harness**: stop generating ~/.claude/CLAUDE.md (redundant with hook injection)
+- address PR #152 review comments — security, predictor, knowledge graph, diagnostics
+- **reconciler**: remove dead buildFrontmatterFingerprint call
+- **predictor**: wire agent feedback into training labels, guard EMA on predictor scores
+- **predictor**: address PR #152 review feedback — 3 logic bugs, 2 auth gaps, 2 style fixes
+- **predictor**: QA fixes — drift wiring, health penalties, error handling
+- **predictor**: implement observability + dashboard tab (Sprint 4)
+- **predictor**: implement session-end comparison + training trigger (Sprint 3)
+- **predictor**: implement daemon scoring integration (Sprint 1 + Sprint 2)
+- **knowledge**: implement ka-6 feedback loop
+- **knowledge**: implement ka-5 continuity and dashboard
+- **predictor**: record structural comparison signals
+- **daemon**: implement KA-3 traversal retrieval wiring
+- add missing agent_id scoping to knowledge-graph queries
+
+### Refactoring
+
+- **dashboard**: unify settings and config into single page
+
+### Docs
+
+- add Desire Paths concept spec for graph-native retrieval
+- address review feedback on specs, dashboard, and vision
+- add Figma MCP integration rules to AGENTS.md
+- full overhaul for total-recall branch
+- testing philosophy and research paper outline
+- KA-3 through KA-6 sprint briefs and exploration philosophy
+- KA-2 sprint brief with two-pass structural assignment architecture
+- update KA spec for agent_id scoping, add KA-1 sprint brief
+- add frontmatter to IDEAL-SIGNET.md
+
+
 ## [0.43.1] - 2026-03-08
 
 ### Features
