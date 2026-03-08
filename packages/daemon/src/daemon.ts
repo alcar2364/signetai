@@ -65,6 +65,20 @@ import {
 	updateCursor,
 } from "./connectors/registry";
 import { normalizeAndHashContent } from "./content-normalization";
+import {
+	type AgentMessage,
+	type AgentMessageType,
+	createAgentMessage,
+	getAgentPresenceForSession,
+	isMessageVisibleToAgent,
+	listAgentMessages,
+	listAgentPresence,
+	relayMessageViaAcp,
+	removeAgentPresence,
+	subscribeCrossAgentEvents,
+	touchAgentPresence,
+	upsertAgentPresence,
+} from "./cross-agent";
 import { closeDbAccessor, getDbAccessor, initDbAccessor } from "./db-accessor";
 import { syncVecDeleteBySourceId, syncVecInsert, vectorToBlob } from "./db-helpers";
 import {
@@ -246,6 +260,7 @@ let authForgetLimiter = new AuthRateLimiter(60_000, 30);
 let authModifyLimiter = new AuthRateLimiter(60_000, 60);
 let authBatchForgetLimiter = new AuthRateLimiter(60_000, 5);
 let authAdminLimiter = new AuthRateLimiter(60_000, 10);
+let authCrossAgentMessageLimiter = new AuthRateLimiter(60_000, 120);
 
 function hasMemoriesSessionIdColumn(db: Database): boolean {
 	if (hasMemoriesSessionIdColumnCache !== null) {
@@ -1162,6 +1177,27 @@ app.use("/api/analytics/*", async (c, next) => {
 	return requirePermission("analytics", authConfig)(c, next);
 });
 
+// Cross-agent collaboration: read inbox/presence with recall, mutate with remember
+app.use("/api/cross-agent", async (c, next) => {
+	if (c.req.method === "GET") {
+		return requirePermission("recall", authConfig)(c, next);
+	}
+	return requirePermission("remember", authConfig)(c, next);
+});
+app.use("/api/cross-agent/*", async (c, next) => {
+	if (c.req.method === "GET") {
+		return requirePermission("recall", authConfig)(c, next);
+	}
+	return requirePermission("remember", authConfig)(c, next);
+});
+app.use("/api/cross-agent/messages", async (c, next) => {
+	if (c.req.method !== "POST") {
+		await next();
+		return;
+	}
+	return requireRateLimit("cross-agent-message", authCrossAgentMessageLimiter, authConfig)(c, next);
+});
+
 // Predictor reporting — read-only (uses analytics permission)
 app.use("/api/predictor/*", async (c, next) => {
 	return requirePermission("analytics", authConfig)(c, next);
@@ -1691,6 +1727,57 @@ function parseOptionalBoolean(value: unknown): boolean | undefined {
 		if (lower === "1" || lower === "true") return true;
 		if (lower === "0" || lower === "false") return false;
 	}
+	return undefined;
+}
+
+function shouldEnforceAuthScope(c: Context): boolean {
+	if (authConfig.mode === "local") return false;
+	const auth = c.get("auth");
+	if (authConfig.mode === "hybrid" && !auth?.claims) return false;
+	return true;
+}
+
+function resolveScopedAgentId(
+	c: Context,
+	requestedAgentId: string | undefined,
+	fallbackAgentId = "default",
+): { agentId: string; error?: string } {
+	const auth = c.get("auth");
+	const scopedAgentId = parseOptionalString(auth?.claims?.scope.agent);
+	const agentId = requestedAgentId ?? scopedAgentId ?? fallbackAgentId;
+
+	if (!shouldEnforceAuthScope(c)) {
+		return { agentId };
+	}
+
+	const decision = checkScope(auth?.claims ?? null, { agent: agentId }, authConfig.mode);
+	if (!decision.allowed) {
+		return { agentId, error: decision.reason ?? "scope violation" };
+	}
+
+	return { agentId };
+}
+
+function validateSessionAgentBinding(
+	c: Context,
+	sessionKey: string | undefined,
+	agentId: string,
+	options: { requireExisting: boolean; context: string },
+): string | undefined {
+	const normalizedSessionKey = parseOptionalString(sessionKey);
+	if (!normalizedSessionKey || !shouldEnforceAuthScope(c)) {
+		return undefined;
+	}
+
+	const existing = getAgentPresenceForSession(normalizedSessionKey);
+	if (!existing) {
+		return options.requireExisting ? `${options.context} is not an active session` : undefined;
+	}
+
+	if (existing.agentId !== agentId) {
+		return `${options.context} belongs to a different agent`;
+	}
+
 	return undefined;
 }
 
@@ -4605,6 +4692,15 @@ app.post("/api/hooks/session-start", async (c) => {
 			}
 		}
 
+		upsertAgentPresence({
+			sessionKey: parseOptionalString(body.sessionKey),
+			agentId: parseOptionalString(body.agentId) ?? "default",
+			harness: body.harness,
+			project: parseOptionalString(body.project),
+			runtimePath,
+			provider: body.harness,
+		});
+
 		stampHarness(body.harness);
 		const result = await handleSessionStart(body);
 		return c.json(result);
@@ -4634,6 +4730,30 @@ app.post("/api/hooks/user-prompt-submit", async (c) => {
 
 		const conflict = checkSessionClaim(c, body.sessionKey, runtimePath);
 		if (conflict) return conflict;
+
+		const sessionKey = parseOptionalString(body.sessionKey);
+		const agentId = parseOptionalString(body.agentId) ?? "default";
+		if (sessionKey) {
+			const touched = touchAgentPresence(sessionKey);
+			if (!touched) {
+				upsertAgentPresence({
+					sessionKey,
+					agentId,
+					harness: body.harness,
+					project: parseOptionalString(body.project),
+					runtimePath,
+					provider: body.harness,
+				});
+			}
+		} else {
+			upsertAgentPresence({
+				agentId,
+				harness: body.harness,
+				project: parseOptionalString(body.project),
+				runtimePath,
+				provider: body.harness,
+			});
+		}
 
 		stampHarness(body.harness);
 		const result = await handleUserPromptSubmit(body);
@@ -4666,6 +4786,7 @@ app.post("/api/hooks/session-end", async (c) => {
 		const sessionKey = body.sessionKey || body.sessionId;
 		if (sessionKey) {
 			releaseSession(sessionKey);
+			removeAgentPresence(sessionKey);
 		}
 
 		return c.json(result);
@@ -4813,6 +4934,366 @@ app.post("/api/hooks/compaction-complete", async (c) => {
 		logger.error("hooks", "Compaction complete failed", e as Error);
 		return c.json({ error: "Failed to save summary" }, 500);
 	}
+});
+
+const AGENT_MESSAGE_TYPES: readonly AgentMessageType[] = ["assist_request", "decision_update", "info", "question"];
+const MAX_CROSS_AGENT_MESSAGE_CHARS = 65_536;
+
+function parseAgentMessageType(value: string | undefined): AgentMessageType | undefined {
+	if (!value) return undefined;
+	for (const type of AGENT_MESSAGE_TYPES) {
+		if (type === value) return type;
+	}
+	return undefined;
+}
+
+// ============================================================================
+// Cross-Agent Collaboration API
+// ============================================================================
+
+app.get("/api/cross-agent/presence", (c) => {
+	const includeSelf = parseOptionalBoolean(c.req.query("include_self")) ?? false;
+	const limit = parseOptionalInt(c.req.query("limit")) ?? 50;
+	const requestedAgentId = parseOptionalString(c.req.query("agent_id"));
+	const sessionKey = parseOptionalString(c.req.query("session_key"));
+	const project = parseOptionalString(c.req.query("project"));
+	const scopedAgent = resolveScopedAgentId(c, requestedAgentId, "default");
+	if (scopedAgent.error) {
+		return c.json({ error: scopedAgent.error }, 403);
+	}
+	const sessionError = validateSessionAgentBinding(c, sessionKey, scopedAgent.agentId, {
+		requireExisting: true,
+		context: "session_key",
+	});
+	if (sessionError) {
+		return c.json({ error: sessionError }, 403);
+	}
+
+	const sessions = listAgentPresence({
+		agentId: scopedAgent.agentId,
+		sessionKey,
+		project,
+		includeSelf,
+		limit,
+	});
+
+	return c.json({
+		sessions,
+		count: sessions.length,
+	});
+});
+
+app.post("/api/cross-agent/presence", async (c) => {
+	const payload = await readOptionalJsonObject(c);
+	if (payload === null) {
+		return c.json({ error: "invalid request body" }, 400);
+	}
+
+	const harness = parseOptionalString(payload.harness);
+	if (!harness) {
+		return c.json({ error: "harness is required" }, 400);
+	}
+
+	const runtimePathRaw = parseOptionalString(payload.runtimePath);
+	const runtimePath = runtimePathRaw === "plugin" || runtimePathRaw === "legacy" ? runtimePathRaw : undefined;
+	const requestedAgentId = parseOptionalString(payload.agentId);
+	const scopedAgent = resolveScopedAgentId(c, requestedAgentId, "default");
+	if (scopedAgent.error) {
+		return c.json({ error: scopedAgent.error }, 403);
+	}
+	const sessionKey = parseOptionalString(payload.sessionKey);
+	const sessionError = validateSessionAgentBinding(c, sessionKey, scopedAgent.agentId, {
+		requireExisting: false,
+		context: "sessionKey",
+	});
+	if (sessionError) {
+		return c.json({ error: sessionError }, 403);
+	}
+
+	const presence = upsertAgentPresence({
+		sessionKey,
+		agentId: scopedAgent.agentId,
+		harness,
+		project: parseOptionalString(payload.project),
+		runtimePath,
+		provider: parseOptionalString(payload.provider) ?? harness,
+	});
+
+	return c.json({ presence });
+});
+
+app.delete("/api/cross-agent/presence/:sessionKey", (c) => {
+	const sessionKey = c.req.param("sessionKey");
+	const scopedAgent = resolveScopedAgentId(c, undefined, "default");
+	if (scopedAgent.error) {
+		return c.json({ error: scopedAgent.error }, 403);
+	}
+	const sessionError = validateSessionAgentBinding(c, sessionKey, scopedAgent.agentId, {
+		requireExisting: false,
+		context: "sessionKey",
+	});
+	if (sessionError) {
+		return c.json({ error: sessionError }, 403);
+	}
+	const removed = removeAgentPresence(sessionKey);
+	return c.json({ removed });
+});
+
+app.get("/api/cross-agent/messages", (c) => {
+	const requestedAgentId = parseOptionalString(c.req.query("agent_id"));
+	const sessionKey = parseOptionalString(c.req.query("session_key"));
+	const since = parseOptionalString(c.req.query("since"));
+	const includeSent = parseOptionalBoolean(c.req.query("include_sent")) ?? false;
+	const includeBroadcast = parseOptionalBoolean(c.req.query("include_broadcast")) ?? true;
+	const limit = parseOptionalInt(c.req.query("limit")) ?? 100;
+	const scopedAgent = resolveScopedAgentId(c, requestedAgentId, "default");
+	if (scopedAgent.error) {
+		return c.json({ error: scopedAgent.error }, 403);
+	}
+	const sessionError = validateSessionAgentBinding(c, sessionKey, scopedAgent.agentId, {
+		requireExisting: true,
+		context: "session_key",
+	});
+	if (sessionError) {
+		return c.json({ error: sessionError }, 403);
+	}
+
+	const items = listAgentMessages({
+		agentId: scopedAgent.agentId,
+		sessionKey,
+		since,
+		includeSent,
+		includeBroadcast,
+		limit,
+	});
+
+	return c.json({
+		items,
+		count: items.length,
+	});
+});
+
+app.post("/api/cross-agent/messages", async (c) => {
+	const payload = await readOptionalJsonObject(c);
+	if (payload === null) {
+		return c.json({ error: "invalid request body" }, 400);
+	}
+
+	const content = parseOptionalString(payload.content);
+	if (!content) {
+		return c.json({ error: "content is required" }, 400);
+	}
+	if (content.length > MAX_CROSS_AGENT_MESSAGE_CHARS) {
+		return c.json({ error: `content too large (max ${MAX_CROSS_AGENT_MESSAGE_CHARS} chars)` }, 400);
+	}
+
+	const deliveryPathRaw = parseOptionalString(payload.via);
+	const deliveryPath = deliveryPathRaw === "acp" ? "acp" : "local";
+
+	const rawType = parseOptionalString(payload.type);
+	const parsedType = parseAgentMessageType(rawType);
+	if (rawType && !parsedType) {
+		return c.json({ error: `unsupported message type '${rawType}'` }, 400);
+	}
+	const type = parsedType ?? "info";
+	const broadcast = parseOptionalBoolean(payload.broadcast) ?? false;
+	const fromAgentId = parseOptionalString(payload.fromAgentId);
+	const scopedSender = resolveScopedAgentId(c, fromAgentId, "default");
+	if (scopedSender.error) {
+		return c.json({ error: scopedSender.error }, 403);
+	}
+	const fromSessionKey = parseOptionalString(payload.fromSessionKey);
+	const fromSessionError = validateSessionAgentBinding(c, fromSessionKey, scopedSender.agentId, {
+		requireExisting: true,
+		context: "fromSessionKey",
+	});
+	if (fromSessionError) {
+		return c.json({ error: fromSessionError }, 403);
+	}
+	const toAgentId = parseOptionalString(payload.toAgentId);
+	const toSessionKey = parseOptionalString(payload.toSessionKey);
+	const hasLocalTarget = broadcast || !!toAgentId || !!toSessionKey;
+	if (deliveryPath === "local" && !hasLocalTarget) {
+		return c.json({ error: "local target required (toAgentId, toSessionKey, or broadcast=true)" }, 400);
+	}
+
+	let deliveryStatus: "queued" | "delivered" | "failed" = "delivered";
+	let deliveryError: string | undefined;
+	let deliveryReceipt: Record<string, unknown> | undefined;
+
+	if (deliveryPath === "acp") {
+		const acpPayload = toRecord(payload.acp);
+		const baseUrl = parseOptionalString(acpPayload?.baseUrl) ?? parseOptionalString(acpPayload?.url);
+		const targetAgentName =
+			parseOptionalString(acpPayload?.targetAgentName) ?? parseOptionalString(acpPayload?.agentName);
+
+		if (!baseUrl || !targetAgentName) {
+			return c.json(
+				{
+					error: "acp.baseUrl and acp.targetAgentName are required when via='acp'",
+				},
+				400,
+			);
+		}
+
+		const timeoutMs = parseOptionalInt(acpPayload?.timeoutMs);
+		const metadata = toRecord(acpPayload?.metadata) ?? undefined;
+
+		const relay = await relayMessageViaAcp({
+			baseUrl,
+			targetAgentName,
+			content,
+			fromAgentId: scopedSender.agentId,
+			fromSessionKey,
+			timeoutMs,
+			metadata,
+		});
+
+		deliveryStatus = relay.ok ? "delivered" : "failed";
+		deliveryError = relay.error;
+		const receipt: Record<string, unknown> = {
+			status: relay.status,
+		};
+		if (relay.runId) {
+			receipt.runId = relay.runId;
+		}
+		deliveryReceipt = receipt;
+	}
+
+	let message: AgentMessage;
+	try {
+		message = createAgentMessage({
+			fromAgentId: scopedSender.agentId,
+			fromSessionKey,
+			toAgentId,
+			toSessionKey,
+			content,
+			type,
+			broadcast,
+			deliveryPath,
+			deliveryStatus,
+			deliveryError,
+			deliveryReceipt,
+		});
+	} catch (error) {
+		const msg = error instanceof Error ? error.message : String(error);
+		return c.json({ error: msg }, 400);
+	}
+
+	return c.json({ message });
+});
+
+app.get("/api/cross-agent/stream", (c) => {
+	const requestedAgentId = parseOptionalString(c.req.query("agent_id"));
+	const sessionKey = parseOptionalString(c.req.query("session_key"));
+	const project = parseOptionalString(c.req.query("project"));
+	const includeSelf = parseOptionalBoolean(c.req.query("include_self")) ?? false;
+	const includeSent = parseOptionalBoolean(c.req.query("include_sent")) ?? false;
+	const encoder = new TextEncoder();
+	const scopedAgent = resolveScopedAgentId(c, requestedAgentId, "default");
+	if (scopedAgent.error) {
+		return c.json({ error: scopedAgent.error }, 403);
+	}
+	const sessionError = validateSessionAgentBinding(c, sessionKey, scopedAgent.agentId, {
+		requireExisting: true,
+		context: "session_key",
+	});
+	if (sessionError) {
+		return c.json({ error: sessionError }, 403);
+	}
+	const agentId = scopedAgent.agentId;
+
+	const stream = new ReadableStream({
+		start(controller) {
+			const writeEvent = (event: unknown) => {
+				const data = `data: ${JSON.stringify(event)}\n\n`;
+				controller.enqueue(encoder.encode(data));
+			};
+
+			writeEvent({
+				type: "connected",
+				agentId,
+				sessionKey,
+				project,
+				timestamp: new Date().toISOString(),
+			});
+
+			writeEvent({
+				type: "snapshot",
+				presence: listAgentPresence({
+					agentId,
+					sessionKey,
+					project,
+					includeSelf,
+					limit: 50,
+				}),
+				messages: listAgentMessages({
+					agentId,
+					sessionKey,
+					includeSent,
+					includeBroadcast: true,
+					limit: 20,
+				}),
+				timestamp: new Date().toISOString(),
+			});
+
+			const unsubscribe = subscribeCrossAgentEvents((event) => {
+				// Message visibility uses isMessageVisibleToAgent(includeBroadcast=true);
+				// includeSent allows showing self-authored messages even when not addressed here.
+				if (event.type === "message") {
+					if (
+						!isMessageVisibleToAgent(event.message, {
+							agentId,
+							sessionKey,
+							includeBroadcast: true,
+						})
+					) {
+						if (!(includeSent && event.message.fromAgentId === agentId)) {
+							return;
+						}
+					}
+				}
+
+				// Presence visibility suppresses self-updates unless includeSelf=true.
+				// Without a sessionKey context we ignore same-agent presence events entirely.
+				if (event.type === "presence" && !includeSelf && event.presence.agentId === agentId) {
+					if (!sessionKey) {
+						return;
+					}
+					if (!event.presence.sessionKey || event.presence.sessionKey === sessionKey) {
+						return;
+					}
+				}
+				if (event.type === "presence" && project && event.presence.project !== project) {
+					return;
+				}
+
+				writeEvent(event);
+			});
+
+			const keepAlive = setInterval(() => {
+				controller.enqueue(encoder.encode(": keepalive\n\n"));
+			}, 15_000);
+
+			c.req.raw.signal.addEventListener("abort", () => {
+				clearInterval(keepAlive);
+				unsubscribe();
+				try {
+					controller.close();
+				} catch {
+					// Stream may already be closed by the runtime.
+				}
+			});
+		},
+	});
+
+	return new Response(stream, {
+		headers: {
+			"Content-Type": "text/event-stream",
+			"Cache-Control": "no-cache",
+			Connection: "keep-alive",
+		},
+	});
 });
 
 // Get synthesis config
