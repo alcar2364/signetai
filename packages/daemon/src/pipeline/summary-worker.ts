@@ -717,12 +717,19 @@ function writeSummaryToDAG(
 		const now = new Date().toISOString();
 		const tokenCount = Math.ceil(result.summary.length / 4);
 
+		// ON CONFLICT preserves the existing row's id so cascade-linked child
+		// and memory rows survive job retries (INSERT OR REPLACE would delete
+		// the old row first, nuking those links).
 		db.prepare(
-			`INSERT OR REPLACE INTO session_summaries (
+			`INSERT INTO session_summaries (
 				id, project, depth, kind, content, token_count,
 				earliest_at, latest_at, session_key, harness,
 				agent_id, created_at
-			) VALUES (?, ?, 0, 'session', ?, ?, ?, ?, ?, ?, ?, ?)`,
+			) VALUES (?, ?, 0, 'session', ?, ?, ?, ?, ?, ?, ?, ?)
+			ON CONFLICT(session_key, depth) DO UPDATE SET
+				content = excluded.content,
+				token_count = excluded.token_count,
+				latest_at = excluded.latest_at`,
 		).run(
 			summaryId,
 			job.project,
