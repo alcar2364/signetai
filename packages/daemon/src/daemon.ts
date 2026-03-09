@@ -2613,6 +2613,11 @@ app.get("/api/memory/:id/history", (c) => {
 	});
 });
 
+// Memory jobs — read-only (uses documents permission)
+app.use("/api/memory/jobs", async (c, next) => {
+	return requirePermission("documents", authConfig)(c, next);
+});
+
 app.get("/api/memory/jobs/:id", (c) => {
 	const jobId = c.req.param("id")?.trim();
 	if (!jobId) {

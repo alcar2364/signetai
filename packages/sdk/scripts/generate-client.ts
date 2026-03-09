@@ -210,4 +210,6 @@ function main(): void {
 	console.log(`  Total methods: ${routes.length}`);
 }
 
-main();
+if (import.meta.main) {
+	main();
+}

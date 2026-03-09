@@ -182,12 +182,14 @@ export interface ContinuityResponse {
   };
 }
 
+export interface ContinuityLatestScore {
+  readonly project: string;
+  readonly score: number;
+  readonly created_at: string;
+}
+
 export interface ContinuityLatestResponse {
-  readonly scores: readonly {
-    readonly project: string;
-    readonly score: number;
-    readonly created_at: string;
-  }[];
+  readonly scores: readonly ContinuityLatestScore[];
 }
 
 // ============================================================================
@@ -210,11 +212,7 @@ export interface KnowledgeEntity {
 
 export interface KnowledgeEntityDetail {
   readonly entity: KnowledgeEntity;
-  readonly aspects: readonly {
-    readonly id: string;
-    readonly label: string;
-    readonly mentionCount: number;
-  }[];
+  readonly aspects: readonly EntityAspect[];
 }
 
 export interface KnowledgeEntityListResponse {
