@@ -2,6 +2,13 @@
 
 All notable changes to Signet are documented here.
 
+## [0.48.0] - 2026-03-09
+
+### Bug Fixes
+
+- **dashboard**: center PageBanner title on pages without side slots (#170)
+
+
 ## [0.47.2] - 2026-03-09
 
 ### Features
