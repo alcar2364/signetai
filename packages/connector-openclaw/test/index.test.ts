@@ -1,33 +1,41 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { OpenClawConnector } from "../src/index";
 
 let tmpRoot = "";
-let previousConfigPath: string | undefined;
-let previousHome: string | undefined;
+const envKeys = [
+	"OPENCLAW_CONFIG_PATH",
+	"CLAWDBOT_CONFIG_PATH",
+	"OPENCLAW_STATE_DIR",
+	"CLAWDBOT_STATE_DIR",
+	"OPENCLAW_STATE_HOME",
+	"OPENCLAW_HOME",
+	"CLAWDBOT_HOME",
+	"MOLDBOT_HOME",
+	"MOLTBOT_HOME",
+	"HOME",
+] as const;
+const previousEnv = new Map<string, string | undefined>();
 
 beforeEach(() => {
 	tmpRoot = mkdtempSync(join(tmpdir(), "signet-openclaw-test-"));
-	previousConfigPath = process.env.OPENCLAW_CONFIG_PATH;
-	previousHome = process.env.HOME;
+	previousEnv.clear();
+	for (const key of envKeys) {
+		previousEnv.set(key, process.env[key]);
+	}
 	process.env.HOME = tmpRoot;
 });
 
 afterEach(() => {
-	if (previousConfigPath === undefined) {
-		// biome-ignore lint/performance/noDelete: assigning undefined to process.env stringifies it
-		delete process.env.OPENCLAW_CONFIG_PATH;
-	} else {
-		process.env.OPENCLAW_CONFIG_PATH = previousConfigPath;
-	}
-
-	if (previousHome === undefined) {
-		// biome-ignore lint/performance/noDelete: assigning undefined to process.env stringifies it
-		delete process.env.HOME;
-	} else {
-		process.env.HOME = previousHome;
+	for (const key of envKeys) {
+		const previous = previousEnv.get(key);
+		if (previous === undefined) {
+			delete process.env[key];
+		} else {
+			process.env[key] = previous;
+		}
 	}
 
 	if (tmpRoot) {
@@ -155,6 +163,56 @@ describe("OpenClawConnector config patching", () => {
 		const workspaces = connector.getDiscoveredWorkspacePaths();
 		expect(workspaces).toContain(workspacePath);
 		expect(workspaces.filter((path) => path === workspacePath)).toHaveLength(1);
+	});
+
+	it("discovers config from OPENCLAW_STATE_DIR", () => {
+		const stateDir = join(tmpRoot, "state-openclaw");
+		const configPath = join(stateDir, "openclaw.json");
+		mkdirSync(stateDir, { recursive: true });
+		writeFileSync(configPath, JSON.stringify({ agents: { defaults: {} } }, null, 2));
+
+		process.env.OPENCLAW_STATE_DIR = stateDir;
+
+		const connector = new OpenClawConnector();
+		expect(connector.getDiscoveredConfigPaths()).toContain(configPath);
+	});
+
+	it("discovers config from CLAWDBOT_STATE_DIR", () => {
+		const stateDir = join(tmpRoot, "state-clawdbot");
+		const configPath = join(stateDir, "clawdbot.json");
+		mkdirSync(stateDir, { recursive: true });
+		writeFileSync(configPath, JSON.stringify({ agents: { defaults: {} } }, null, 2));
+
+		process.env.CLAWDBOT_STATE_DIR = stateDir;
+
+		const connector = new OpenClawConnector();
+		expect(connector.getDiscoveredConfigPaths()).toContain(configPath);
+	});
+
+	it("discovers moldbot and moltbot legacy default directories", () => {
+		const moldbotPath = join(tmpRoot, ".moldbot", "moldbot.json");
+		const moltbotPath = join(tmpRoot, ".moltbot", "moltbot.json");
+		mkdirSync(join(tmpRoot, ".moldbot"), { recursive: true });
+		mkdirSync(join(tmpRoot, ".moltbot"), { recursive: true });
+		writeFileSync(moldbotPath, JSON.stringify({ agents: { defaults: {} } }, null, 2));
+		writeFileSync(moltbotPath, JSON.stringify({ agents: { defaults: {} } }, null, 2));
+
+		const connector = new OpenClawConnector();
+		const discovered = connector.getDiscoveredConfigPaths();
+		expect(discovered).toContain(moldbotPath);
+		expect(discovered).toContain(moltbotPath);
+	});
+
+	it("keeps legacy OPENCLAW_STATE_HOME compatibility", () => {
+		const stateHome = join(tmpRoot, "legacy-state-home");
+		const configPath = join(stateHome, "openclaw.json");
+		mkdirSync(stateHome, { recursive: true });
+		writeFileSync(configPath, JSON.stringify({ agents: { defaults: {} } }, null, 2));
+
+		process.env.OPENCLAW_STATE_HOME = stateHome;
+
+		const connector = new OpenClawConnector();
+		expect(connector.getDiscoveredConfigPaths()).toContain(configPath);
 	});
 
 	it("ignores invalid configs when discovering workspaces", () => {

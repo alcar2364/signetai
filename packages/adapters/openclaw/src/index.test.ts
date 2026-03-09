@@ -1,0 +1,161 @@
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import signetPlugin from "./index";
+import type { OpenClawPluginApi } from "./openclaw-types";
+
+type HookHandler = (event: Record<string, unknown>, ctx: unknown) => Promise<unknown> | unknown;
+
+const originalFetch = globalThis.fetch;
+let pathCounts = new Map<string, number>();
+let registeredServices: Array<{ stop: () => void | Promise<void> }> = [];
+
+function hit(path: string): void {
+	pathCounts.set(path, (pathCounts.get(path) ?? 0) + 1);
+}
+
+function getHits(path: string): number {
+	return pathCounts.get(path) ?? 0;
+}
+
+function jsonResponse(body: unknown, status = 200): Response {
+	return new Response(JSON.stringify(body), {
+		status,
+		headers: {
+			"content-type": "application/json",
+		},
+	});
+}
+
+function createMockApi(): {
+	api: OpenClawPluginApi;
+	hooks: Map<string, HookHandler>;
+} {
+	const hooks = new Map<string, HookHandler>();
+
+	const api: OpenClawPluginApi = {
+		pluginConfig: {
+			enabled: true,
+			daemonUrl: "http://daemon.test",
+		},
+		logger: {
+			info() {
+				// no-op in tests
+			},
+			warn() {
+				// no-op in tests
+			},
+			error() {
+				// no-op in tests
+			},
+		},
+		registerTool() {
+			// no-op
+		},
+		registerCli() {
+			// no-op
+		},
+		registerService(service) {
+			registeredServices.push(service);
+		},
+		on(event, handler) {
+			hooks.set(event, handler);
+		},
+		resolvePath(input) {
+			return input;
+		},
+	};
+
+	return { api, hooks };
+}
+
+beforeEach(() => {
+	pathCounts = new Map<string, number>();
+	registeredServices = [];
+
+	globalThis.fetch = (async (input) => {
+		const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+		const path = new URL(url).pathname;
+		hit(path);
+
+		switch (path) {
+			case "/health":
+				return new Response("ok", { status: 200 });
+			case "/api/hooks/session-start":
+				return jsonResponse({ ok: true });
+			case "/api/hooks/user-prompt-submit":
+				return jsonResponse({
+					inject: "turn-memory",
+					memoryCount: 2,
+					engine: "fts+decay",
+				});
+			case "/api/hooks/session-end":
+				return jsonResponse({ memoriesSaved: 0 });
+			case "/api/marketplace/mcp/tools":
+				return jsonResponse({ count: 0, tools: [], servers: [] });
+			case "/api/marketplace/mcp/policy":
+				return jsonResponse({
+					policy: {
+						mode: "compact",
+						maxExpandedTools: 12,
+						maxSearchResults: 20,
+						updatedAt: "2026-03-08T00:00:00Z",
+					},
+				});
+			default:
+				return jsonResponse({ error: "not found" }, 404);
+		}
+	}) as typeof fetch;
+});
+
+afterEach(async () => {
+	globalThis.fetch = originalFetch;
+	for (const service of registeredServices) {
+		await service.stop();
+	}
+});
+
+describe("signet-memory-openclaw lifecycle hooks", () => {
+	it("prefers before_prompt_build and deduplicates legacy fallback for the same turn", async () => {
+		const { api, hooks } = createMockApi();
+		signetPlugin.register(api);
+
+		const beforePromptBuild = hooks.get("before_prompt_build");
+		const beforeAgentStart = hooks.get("before_agent_start");
+
+		expect(beforePromptBuild).toBeDefined();
+		expect(beforeAgentStart).toBeDefined();
+
+		const event = {
+			prompt: "Remember release criteria for this plugin",
+			messages: [{ role: "assistant", content: "Prior context" }],
+		};
+		const ctx = {
+			sessionKey: "session-1",
+			agentId: "agent-1",
+		};
+
+		const first = await beforePromptBuild?.(event, ctx);
+		const second = await beforeAgentStart?.(event, ctx);
+
+		expect((first as { prependContext?: string } | undefined)?.prependContext).toContain("turn-memory");
+		expect(second).toBeUndefined();
+		expect(getHits("/api/hooks/user-prompt-submit")).toBe(1);
+		expect(getHits("/api/hooks/session-start")).toBe(1);
+	});
+
+	it("keeps legacy before_agent_start path working when used alone", async () => {
+		const { api, hooks } = createMockApi();
+		signetPlugin.register(api);
+
+		const beforeAgentStart = hooks.get("before_agent_start");
+		expect(beforeAgentStart).toBeDefined();
+
+		const result = await beforeAgentStart?.(
+			{ prompt: "Legacy prompt path should still inject" },
+			{ sessionKey: "legacy-1", agentId: "agent-legacy" },
+		);
+
+		expect((result as { prependContext?: string } | undefined)?.prependContext).toContain("turn-memory");
+		expect(getHits("/api/hooks/user-prompt-submit")).toBe(1);
+		expect(getHits("/api/hooks/session-start")).toBe(1);
+	});
+});
