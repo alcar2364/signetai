@@ -2,6 +2,15 @@
 
 All notable changes to Signet are documented here.
 
+## [0.53.0] - 2026-03-09
+
+### Bug Fixes
+
+- **sdk,daemon**: address CodeRabbit critical and nitpick findings
+- **sdk**: strict typescript discipline - remove unsafe casts, add type guards, discriminated unions
+- **sdk**: align sdk contracts with daemon responses
+
+
 ## [0.52.0] - 2026-03-09
 
 ### Features
