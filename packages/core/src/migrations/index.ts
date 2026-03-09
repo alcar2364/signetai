@@ -32,6 +32,8 @@ import { up as predictorColumns } from "./023-predictor-columns";
 import { up as predictorComparisonColumns } from "./024-predictor-comparison-columns";
 import { up as agentFeedback } from "./025-agent-feedback";
 import { up as predictorTrainingPairs } from "./026-predictor-training-pairs";
+import { up as losslessRetention } from "./027-lossless-retention";
+import { up as sessionSummaryDag } from "./028-session-summary-dag";
 
 // -- Public interface consumed by Database.init() --
 
@@ -161,6 +163,16 @@ export const MIGRATIONS: readonly Migration[] = [
 		version: 26,
 		name: "predictor-training-pairs",
 		up: predictorTrainingPairs,
+	},
+	{
+		version: 27,
+		name: "lossless-retention",
+		up: losslessRetention,
+	},
+	{
+		version: 28,
+		name: "session-summary-dag",
+		up: sessionSummaryDag,
 	},
 ];
 

@@ -20,6 +20,10 @@ import { getLlmProvider } from "../llm";
 import { isDuplicate, inferType } from "../hooks";
 import { loadMemoryConfig } from "../memory-config";
 import { logger } from "../logger";
+import {
+	assessSignificance,
+	type SignificanceConfig,
+} from "./significance-gate";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -178,6 +182,43 @@ async function processJob(
 	provider: LlmProvider,
 	job: SummaryJobRow,
 ): Promise<void> {
+	// --- Significance gate ---
+	const memoryCfg = loadMemoryConfig(AGENTS_DIR);
+	const significanceCfg: SignificanceConfig =
+		memoryCfg.pipelineV2.significance ?? {
+			enabled: true,
+			minTurns: 5,
+			minEntityOverlap: 1,
+			noveltyThreshold: 0.15,
+		};
+
+	if (significanceCfg.enabled) {
+		const assessment = accessor.withReadDb((db) =>
+			assessSignificance(
+				job.transcript,
+				db,
+				"default",
+				significanceCfg,
+			),
+		);
+
+		if (!assessment.significant) {
+			logger.info(
+				"summary-worker",
+				"Session below significance threshold — skipping extraction",
+				{
+					sessionKey: job.session_key,
+					project: job.project,
+					scores: assessment.scores,
+					reason: assessment.reason,
+				},
+			);
+			// Job row and transcript are preserved (lossless retention).
+			// processJob caller marks it completed.
+			return;
+		}
+	}
+
 	const today = new Date().toISOString().slice(0, 10);
 
 	const prompt = buildPrompt(job.transcript, today);
@@ -202,7 +243,6 @@ async function processJob(
 		sessionKey: job.session_key,
 		project: job.project,
 		summaryChars: result.summary.length,
-		summary: result.summary,
 	});
 
 	const saved = insertSummaryFacts(accessor, job, result.facts);
@@ -216,6 +256,15 @@ async function processJob(
 			.map((fact) => fact.content),
 	});
 
+	// Write to session_summaries DAG (depth 0 = session level)
+	try {
+		writeSummaryToDAG(accessor, job, result);
+	} catch (e) {
+		logger.warn("summary-worker", "Failed to write session summary to DAG (non-fatal)", {
+			error: e instanceof Error ? e.message : String(e),
+		});
+	}
+
 	// --- Session continuity scoring ---
 	try {
 		await scoreContinuity(accessor, provider, job, result.summary);
@@ -228,7 +277,7 @@ async function processJob(
 	// --- Predictor comparison (Sprint 3) ---
 	// Runs after continuity scoring has written per-memory relevance scores
 	// and session_scores. Uses dynamic imports to avoid circular deps.
-	const memoryCfg = loadMemoryConfig(AGENTS_DIR);
+	// memoryCfg already loaded at function entry (significance gate).
 	// Agent ID is hardcoded because summary_jobs and session_scores tables
 	// lack an agent_id column (pre-existing schema limitation). In a
 	// multi-agent deployment, all predictor comparisons route to the
@@ -644,6 +693,70 @@ export function insertSummaryFacts(
 }
 
 // ---------------------------------------------------------------------------
+// DAG write helper
+// ---------------------------------------------------------------------------
+
+function writeSummaryToDAG(
+	accessor: DbAccessor,
+	job: SummaryJobRow,
+	result: LlmSummaryResult,
+): void {
+	accessor.withWriteTx((db) => {
+		// Check if table exists (migration may not have run)
+		const row = db
+			.prepare(
+				`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'session_summaries'`,
+			)
+			.get();
+		if (!row) return;
+
+		const summaryId = crypto.randomUUID();
+		const now = new Date().toISOString();
+		const tokenCount = Math.ceil(result.summary.length / 4);
+
+		db.prepare(
+			`INSERT INTO session_summaries (
+				id, project, depth, kind, content, token_count,
+				earliest_at, latest_at, session_key, harness,
+				agent_id, created_at
+			) VALUES (?, ?, 0, 'session', ?, ?, ?, ?, ?, ?, 'default', ?)`,
+		).run(
+			summaryId,
+			job.project,
+			result.summary,
+			tokenCount,
+			now,
+			now,
+			job.session_key,
+			job.harness,
+			now,
+		);
+
+		// Link extracted memories to this summary.
+		// Match by source_id containing the session key.
+		if (job.session_key) {
+			const recentMemories = db
+				.prepare(
+					`SELECT id FROM memories
+					 WHERE source_id = ?
+					   AND is_deleted = 0
+					 ORDER BY created_at DESC
+					 LIMIT 50`,
+				)
+				.all(job.session_key) as Array<{ id: string }>;
+
+			const linkStmt = db.prepare(
+				`INSERT OR IGNORE INTO session_summary_memories (summary_id, memory_id)
+				 VALUES (?, ?)`,
+			);
+			for (const mem of recentMemories) {
+				linkStmt.run(summaryId, mem.id);
+			}
+		}
+	});
+}
+
+// ---------------------------------------------------------------------------
 // Worker loop
 // ---------------------------------------------------------------------------
 
@@ -818,7 +931,6 @@ export function enqueueSummaryJob(
 		sessionKey: params.sessionKey,
 		project: params.project,
 		transcriptChars: params.transcript.length,
-		transcript: params.transcript,
 	});
 
 	return id;

@@ -139,6 +139,56 @@ function purgeEmbeddings(db: WriteDb, cutoff: string, limit: number): number {
 	return countChanges(result);
 }
 
+/**
+ * Archive memories to the cold tier before hard-deleting them.
+ *
+ * Copies the memory rows into `memories_cold` with the given reason.
+ * Uses INSERT OR IGNORE so re-archiving the same ID is a no-op.
+ * Gracefully skips if the cold table doesn't exist yet (migration
+ * may not have run).
+ */
+export function archiveToCold(
+	db: WriteDb,
+	memoryIds: ReadonlyArray<string>,
+	reason: string,
+	coldSourceId?: string,
+): void {
+	if (memoryIds.length === 0) return;
+
+	// Check if memories_cold table exists (migration may not have run yet)
+	const tableExists = db
+		.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'memories_cold'`)
+		.get();
+	if (!tableExists) {
+		logger.warn("retention", "memories_cold table missing — skipping archival (run migrations)", {
+			count: memoryIds.length,
+		});
+		return;
+	}
+
+	const placeholders = memoryIds.map(() => "?").join(", ");
+
+	db.prepare(`
+		INSERT OR IGNORE INTO memories_cold (
+			id, type, category, content, confidence, importance,
+			source_id, source_type, tags, who, why, project,
+			content_hash, normalized_content, extraction_status,
+			embedding_model, extraction_model, update_count,
+			original_created_at, archived_at, archived_reason,
+			cold_source_id, agent_id
+		)
+		SELECT
+			id, type, category, content, confidence, importance,
+			source_id, source_type, tags, who, why, project,
+			content_hash, normalized_content, extraction_status,
+			embedding_model, extraction_model, update_count,
+			created_at, datetime('now'), ?,
+			?, agent_id
+		FROM memories
+		WHERE id IN (${placeholders})
+	`).run(reason, coldSourceId ?? null, ...memoryIds);
+}
+
 function purgeTombstones(db: WriteDb, cutoff: string, limit: number): number {
 	const expiredIds = db
 		.prepare(
@@ -150,10 +200,14 @@ function purgeTombstones(db: WriteDb, cutoff: string, limit: number): number {
 
 	if (expiredIds.length === 0) return 0;
 
-	// Hard-delete the memory rows; the memories_ad trigger handles FTS cleanup.
-	// We count selected IDs rather than .changes because FTS triggers inflate it.
 	const placeholders = expiredIds.map(() => "?").join(", ");
 	const ids = expiredIds.map((r) => r.id);
+
+	// Archive to cold tier before deleting
+	archiveToCold(db, ids, "retention_decay");
+
+	// Hard-delete the memory rows; the memories_ad trigger handles FTS cleanup.
+	// We count selected IDs rather than .changes because FTS triggers inflate it.
 	db.prepare(`DELETE FROM memories WHERE id IN (${placeholders})`).run(...ids);
 
 	return expiredIds.length;
@@ -170,11 +224,7 @@ function purgeHistory(db: WriteDb, cutoff: string, limit: number): number {
 	return countChanges(result);
 }
 
-function purgeCompletedJobs(
-	db: WriteDb,
-	cutoff: string,
-	limit: number,
-): number {
+function purgeCompletedJobs(db: WriteDb, cutoff: string, limit: number): number {
 	const result = db
 		.prepare(
 			`DELETE FROM memory_jobs
@@ -196,51 +246,32 @@ function purgeDeadJobs(db: WriteDb, cutoff: string, limit: number): number {
 	return countChanges(result);
 }
 
-function runSweep(
-	accessor: DbAccessor,
-	cfg: RetentionConfig,
-): RetentionSweepResult {
+function runSweep(accessor: DbAccessor, cfg: RetentionConfig): RetentionSweepResult {
 	const now = Date.now();
-	const tombstoneCutoff = new Date(
-		now - cfg.tombstoneRetentionMs,
-	).toISOString();
+	const tombstoneCutoff = new Date(now - cfg.tombstoneRetentionMs).toISOString();
 	const historyCutoff = new Date(now - cfg.historyRetentionMs).toISOString();
-	const completedJobCutoff = new Date(
-		now - cfg.completedJobRetentionMs,
-	).toISOString();
+	const completedJobCutoff = new Date(now - cfg.completedJobRetentionMs).toISOString();
 	const deadJobCutoff = new Date(now - cfg.deadJobRetentionMs).toISOString();
 
 	// Step 1: graph links for expired tombstones + entity decrement
-	const graphResult = accessor.withWriteTx((db) =>
-		purgeGraphLinks(db, tombstoneCutoff, cfg.batchLimit),
-	);
+	const graphResult = accessor.withWriteTx((db) => purgeGraphLinks(db, tombstoneCutoff, cfg.batchLimit));
 	const graphLinksPurged = graphResult.mentionsPurged;
 	const entitiesOrphaned = graphResult.entitiesOrphaned;
 
 	// Step 2: embeddings for expired tombstones
-	const embeddingsPurged = accessor.withWriteTx((db) =>
-		purgeEmbeddings(db, tombstoneCutoff, cfg.batchLimit),
-	);
+	const embeddingsPurged = accessor.withWriteTx((db) => purgeEmbeddings(db, tombstoneCutoff, cfg.batchLimit));
 
 	// Step 3: hard-delete tombstoned rows (FTS cleanup via memories_ad trigger)
-	const tombstonesPurged = accessor.withWriteTx((db) =>
-		purgeTombstones(db, tombstoneCutoff, cfg.batchLimit),
-	);
+	const tombstonesPurged = accessor.withWriteTx((db) => purgeTombstones(db, tombstoneCutoff, cfg.batchLimit));
 
 	// Step 4: old history events
-	const historyPurged = accessor.withWriteTx((db) =>
-		purgeHistory(db, historyCutoff, cfg.batchLimit),
-	);
+	const historyPurged = accessor.withWriteTx((db) => purgeHistory(db, historyCutoff, cfg.batchLimit));
 
 	// Step 5: completed jobs
-	const completedJobsPurged = accessor.withWriteTx((db) =>
-		purgeCompletedJobs(db, completedJobCutoff, cfg.batchLimit),
-	);
+	const completedJobsPurged = accessor.withWriteTx((db) => purgeCompletedJobs(db, completedJobCutoff, cfg.batchLimit));
 
 	// Step 6: dead-letter jobs
-	const deadJobsPurged = accessor.withWriteTx((db) =>
-		purgeDeadJobs(db, deadJobCutoff, cfg.batchLimit),
-	);
+	const deadJobsPurged = accessor.withWriteTx((db) => purgeDeadJobs(db, deadJobCutoff, cfg.batchLimit));
 
 	// Step 7: old predictor training pairs (90-day retention)
 	const trainingPairsPurged = purgeOldTrainingPairs(accessor, 90);
@@ -257,10 +288,7 @@ function runSweep(
 	};
 }
 
-export function startRetentionWorker(
-	accessor: DbAccessor,
-	cfg: RetentionConfig = DEFAULT_RETENTION,
-): RetentionHandle {
+export function startRetentionWorker(accessor: DbAccessor, cfg: RetentionConfig = DEFAULT_RETENTION): RetentionHandle {
 	let running = true;
 	let timer: ReturnType<typeof setInterval> | null = null;
 
