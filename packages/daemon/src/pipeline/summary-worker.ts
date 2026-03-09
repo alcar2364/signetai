@@ -42,6 +42,7 @@ interface SummaryJobRow {
 	readonly transcript: string;
 	readonly attempts: number;
 	readonly max_attempts: number;
+	readonly created_at: string;
 }
 
 interface LlmSummaryResult {
@@ -725,8 +726,8 @@ function writeSummaryToDAG(
 			job.project,
 			result.summary,
 			tokenCount,
-			now,
-			now,
+			job.created_at, // session start time
+			now,            // processing time ≈ session end time
 			job.session_key,
 			job.harness,
 			now,
@@ -785,7 +786,7 @@ export function startSummaryWorker(
 				const row = db
 					.prepare(
 						`SELECT id, session_key, harness, project, transcript,
-						        attempts, max_attempts
+						        attempts, max_attempts, created_at
 						 FROM summary_jobs
 						 WHERE status = 'pending' AND attempts < max_attempts
 						 ORDER BY created_at ASC

@@ -81,12 +81,12 @@ export function checkEscalationNeeded(
 
 const MAX_INPUT_CHARS = 12000;
 
-export function buildLevel2Prompt(content: string): string {
+export function buildLevel2Prompt(content: string, maxEntities = 5): string {
 	const truncated = content.length > MAX_INPUT_CHARS ? `${content.slice(0, MAX_INPUT_CHARS)}\n[truncated]` : content;
 
 	return `Extract only decisions, constraints, and persistent facts from this text.
 Ignore transient states, error messages, and conversational scaffolding.
-Maximum 5 new entities per chunk.
+Maximum ${maxEntities} new entities per chunk.
 
 Return JSON with two arrays: "facts" and "entities".
 
@@ -103,8 +103,12 @@ Text:
 ${truncated}`;
 }
 
-async function runLevel2Extraction(content: string, provider: LlmProvider): Promise<ExtractionResult> {
-	const prompt = buildLevel2Prompt(content);
+async function runLevel2Extraction(
+	content: string,
+	provider: LlmProvider,
+	maxEntities: number,
+): Promise<ExtractionResult> {
+	const prompt = buildLevel2Prompt(content, maxEntities);
 	let rawOutput: string;
 	try {
 		rawOutput = await provider.generate(prompt);
@@ -239,7 +243,7 @@ export async function escalate(
 		threshold: thresholds.maxNewEntitiesPerChunk,
 	});
 
-	const level2 = await runLevel2Extraction(content, provider);
+	const level2 = await runLevel2Extraction(content, provider, thresholds.level2MaxEntities);
 	const level2Needed = checkEscalationNeeded(level2, thresholds);
 	if (level2Needed === 1) {
 		return { result: level2, level: 2, originalEntityCount, originalFactCount };

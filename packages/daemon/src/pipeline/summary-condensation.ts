@@ -84,24 +84,25 @@ export async function checkAndCondense(
 	if (uncondensedSessions.length >= cfg.arcThreshold) {
 		const batch = uncondensedSessions.slice(0, cfg.arcThreshold);
 		await condenseToArc(accessor, provider, batch, agentId);
+	}
 
-		// After arc creation, check for epoch condensation
-		const uncondensedArcs = accessor.withReadDb((db) => {
-			return db
-				.prepare(
-					`SELECT id, content, project, earliest_at, latest_at
-					 FROM session_summaries
-					 WHERE project = ? AND kind = 'arc' AND depth = 1
-					   AND id NOT IN (SELECT child_id FROM session_summary_children)
-					 ORDER BY created_at ASC`,
-				)
-				.all(project) as SummaryRow[];
-		});
+	// Epoch check is independent: arcs accumulate across many ticks,
+	// so we always query — not just when arc condensation just fired.
+	const uncondensedArcs = accessor.withReadDb((db) => {
+		return db
+			.prepare(
+				`SELECT id, content, project, earliest_at, latest_at
+				 FROM session_summaries
+				 WHERE project = ? AND kind = 'arc' AND depth = 1
+				   AND id NOT IN (SELECT child_id FROM session_summary_children)
+				 ORDER BY created_at ASC`,
+			)
+			.all(project) as SummaryRow[];
+	});
 
-		if (uncondensedArcs.length >= cfg.epochThreshold) {
-			const arcBatch = uncondensedArcs.slice(0, cfg.epochThreshold);
-			await condenseToEpoch(accessor, provider, arcBatch, agentId);
-		}
+	if (uncondensedArcs.length >= cfg.epochThreshold) {
+		const arcBatch = uncondensedArcs.slice(0, cfg.epochThreshold);
+		await condenseToEpoch(accessor, provider, arcBatch, agentId);
 	}
 }
 

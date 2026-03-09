@@ -6540,21 +6540,14 @@ app.post("/api/repair/deduplicate", async (c) => {
 });
 
 app.post("/api/repair/backfill-skipped", (c) => {
-	const accessor = getDbAccessor();
-	const count = accessor.withReadDb((db) => {
-		const row = db
-			.prepare(
-				"SELECT COUNT(*) as cnt FROM summary_jobs WHERE status = 'completed'",
-			)
-			.get() as { cnt: number } | undefined;
-		return row?.cnt ?? 0;
-	});
-	return c.json({
-		requeued: 0,
-		eligible: count,
-		message:
-			"Backfill endpoint ready — re-enqueue logic pending session summary DAG",
-	});
+	return c.json(
+		{
+			error: "not_implemented",
+			message:
+				"Backfill-skipped re-enqueue logic is pending. This endpoint is reserved for future implementation.",
+		},
+		501,
+	);
 });
 
 app.post("/api/repair/reclassify-entities", async (c) => {
