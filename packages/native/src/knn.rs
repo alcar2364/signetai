@@ -19,7 +19,7 @@ fn normalise_one(values: &[f64], scale: f64) -> Vec<f64> {
         if v < min { min = v; }
         if v > max { max = v; }
     }
-    let range = if (max - min).abs() < f64::EPSILON { 1.0 } else { max - min };
+    let range = if (max - min) == 0.0 { 1.0 } else { max - min };
     values.iter().map(|&v| ((v - min) / range - 0.5) * scale).collect()
 }
 
