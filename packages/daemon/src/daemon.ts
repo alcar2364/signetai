@@ -8030,7 +8030,9 @@ function startFileWatcher() {
 		}
 
 		// Ingest memory markdown files (excluding MEMORY.md index)
-		if (path.includes("/memory/") && path.endsWith(".md") && !path.endsWith("MEMORY.md")) {
+		// Normalize path separators for Windows compatibility (watcher returns backslashes on Windows)
+		const normalizedPath = path.replace(/\\/g, "/");
+		if (normalizedPath.includes("/memory/") && normalizedPath.endsWith(".md") && !normalizedPath.endsWith("MEMORY.md")) {
 			ingestMemoryMarkdown(path).catch((e) =>
 				logger.error("watcher", "Ingestion failed", undefined, {
 					path,
@@ -8054,7 +8056,9 @@ function startFileWatcher() {
 		scheduleAutoCommit(path);
 
 		// Ingest new memory markdown files
-		if (path.includes("/memory/") && path.endsWith(".md") && !path.endsWith("MEMORY.md")) {
+		// Normalize path separators for Windows compatibility
+		const normalizedAddPath = path.replace(/\\/g, "/");
+		if (normalizedAddPath.includes("/memory/") && normalizedAddPath.endsWith(".md") && !normalizedAddPath.endsWith("MEMORY.md")) {
 			ingestMemoryMarkdown(path).catch((e) =>
 				logger.error("watcher", "Ingestion failed", undefined, {
 					path,
