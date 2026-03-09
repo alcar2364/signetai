@@ -68,7 +68,13 @@ pub(crate) async fn restart_daemon_inner(
     _app: &AppHandle,
 ) -> Result<(), String> {
     daemon::stop().map_err(|e| e.to_string())?;
-    std::thread::sleep(std::time::Duration::from_millis(500));
+    // Brief pause between stop/start. Uses spawn_blocking to avoid
+    // holding the async runtime thread during the wait.
+    tauri::async_runtime::spawn_blocking(|| {
+        std::thread::sleep(std::time::Duration::from_millis(500));
+    })
+    .await
+    .map_err(|e| e.to_string())?;
     daemon::start().map_err(|e| e.to_string())
 }
 

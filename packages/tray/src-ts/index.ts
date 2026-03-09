@@ -45,14 +45,16 @@ async function pollHealth(): Promise<void> {
   const alive = await fetchHealth(DAEMON_URL);
 
   if (alive && !isRunning) {
-    // Just came online — kick off secondary polls and show dashboard
+    // Just came online — kick off secondary polls
     isRunning = true;
-    everSeenRunning = true;
     fetchMemories(DAEMON_URL);
     fetchDiagnostics(DAEMON_URL);
     fetchEmbeddings(DAEMON_URL);
-    // Auto-show the main window now that daemon is healthy
-    invoke("open_dashboard").catch((e) => console.error("open_dashboard:", e));
+    // Auto-show dashboard only on first discovery, not on reconnects
+    if (!everSeenRunning) {
+      invoke("open_dashboard").catch((e) => console.error("open_dashboard:", e));
+    }
+    everSeenRunning = true;
   } else if (!alive && isRunning) {
     isRunning = false;
     resetState();
