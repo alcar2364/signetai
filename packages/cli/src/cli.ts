@@ -3828,12 +3828,12 @@ program
 
 const DAEMON_URL = `http://localhost:${DEFAULT_PORT}`;
 
-async function secretApiCall(method: string, path: string, body?: unknown): Promise<{ ok: boolean; data: unknown }> {
+async function secretApiCall(method: string, path: string, body?: unknown, timeoutMs = 5_000): Promise<{ ok: boolean; data: unknown }> {
 	const res = await fetch(`${DAEMON_URL}${path}`, {
 		method,
 		headers: body ? { "Content-Type": "application/json" } : {},
 		body: body ? JSON.stringify(body) : undefined,
-		signal: AbortSignal.timeout(5000),
+		signal: AbortSignal.timeout(timeoutMs),
 	});
 	const data = await res.json();
 	return { ok: res.ok, data };
@@ -3945,7 +3945,11 @@ secretCmd
 		if (!(await ensureDaemonForSecrets())) return;
 
 		try {
-			const { data } = await secretApiCall("GET", "/api/secrets");
+			const { ok, data } = await secretApiCall("GET", "/api/secrets");
+			if (!ok) {
+				console.error(chalk.red(`  Error: ${(data as { error: string }).error}`));
+				process.exit(1);
+			}
 			const secrets = (data as { secrets: string[] }).secrets ?? [];
 			const exists = secrets.includes(name);
 
@@ -3994,7 +3998,7 @@ secretCmd
 			const { ok, data } = await secretApiCall("POST", "/api/secrets/exec", {
 				command,
 				secrets,
-			});
+			}, 60_000);
 
 			if (!ok) {
 				console.error(chalk.red(`  Error: ${(data as { error: string }).error}`));
