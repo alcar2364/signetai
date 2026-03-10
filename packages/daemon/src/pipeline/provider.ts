@@ -466,8 +466,8 @@ const ANTHROPIC_API_VERSION = "2023-06-01";
 function resolveAnthropicModel(model: string): string {
 	const aliases: Record<string, string> = {
 		haiku: "claude-haiku-4-5-20251001",
-		sonnet: "claude-sonnet-4-6-20250514",
-		opus: "claude-opus-4-6-20250514",
+		sonnet: "claude-sonnet-4-6",
+		opus: "claude-opus-4-6",
 	};
 	return aliases[model] ?? model;
 }
@@ -631,7 +631,8 @@ export function createAnthropicProvider(
 				// Don't retry non-retryable errors
 				if (e instanceof Error && (
 					e.message.includes("auth failed") ||
-					e.message.includes("timeout after")
+					e.message.includes("timeout after") ||
+					e.message.includes("empty response")
 				)) {
 					throw e;
 				}
@@ -696,8 +697,12 @@ export function createAnthropicProvider(
 					}),
 					signal: AbortSignal.timeout(5000),
 				});
-				// 200 = works, 401 = bad key but API is reachable
-				return res.ok || res.status === 401;
+				// 200 = works; 401 = bad key means provider is NOT usable
+				if (res.status === 401) {
+					logger.warn("pipeline", "Anthropic API key is invalid (401)");
+					return false;
+				}
+				return res.ok;
 			} catch {
 				logger.debug("pipeline", "Anthropic API not reachable");
 				return false;

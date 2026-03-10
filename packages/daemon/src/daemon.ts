@@ -9131,31 +9131,38 @@ async function main() {
 		}
 	}
 
+	// When falling back to ollama, reset model so ollama uses its own default
+	// instead of inheriting an anthropic-specific alias like "haiku".
+	let effectiveExtractionModel: string | undefined = memoryCfg.pipelineV2.extraction.model;
+	if (effectiveExtractionProvider === "ollama" && memoryCfg.pipelineV2.extraction.provider !== "ollama") {
+		effectiveExtractionModel = undefined;
+	}
+
 	// Create LLM provider once, register as daemon-wide singleton
 	const llmProvider =
 		effectiveExtractionProvider === "anthropic"
 			? createAnthropicProvider({
-					model: memoryCfg.pipelineV2.extraction.model || "haiku",
+					model: effectiveExtractionModel || "haiku",
 					apiKey: anthropicApiKey ?? "",
 					defaultTimeoutMs: memoryCfg.pipelineV2.extraction.timeout,
 				})
 			: effectiveExtractionProvider === "opencode"
 				? createOpenCodeProvider({
-						model: memoryCfg.pipelineV2.extraction.model || "anthropic/claude-haiku-4-5-20251001",
+						model: effectiveExtractionModel || "anthropic/claude-haiku-4-5-20251001",
 						defaultTimeoutMs: memoryCfg.pipelineV2.extraction.timeout,
 					})
 				: effectiveExtractionProvider === "claude-code"
 					? createClaudeCodeProvider({
-							model: memoryCfg.pipelineV2.extraction.model || "haiku",
+							model: effectiveExtractionModel || "haiku",
 							defaultTimeoutMs: memoryCfg.pipelineV2.extraction.timeout,
 						})
 					: effectiveExtractionProvider === "codex"
 						? createCodexProvider({
-								model: memoryCfg.pipelineV2.extraction.model || "gpt-5.3-codex",
+								model: effectiveExtractionModel || "gpt-5.3-codex",
 								defaultTimeoutMs: memoryCfg.pipelineV2.extraction.timeout,
 							})
 						: createOllamaProvider({
-								model: memoryCfg.pipelineV2.extraction.model || "qwen3:4b",
+								model: effectiveExtractionModel || "qwen3:4b",
 								defaultTimeoutMs: memoryCfg.pipelineV2.extraction.timeout,
 							});
 	initLlmProvider(llmProvider);
@@ -9194,25 +9201,31 @@ async function main() {
 		}
 		logger.info("config", "Synthesis provider", { provider: effectiveSynthesisProvider });
 
+		// When falling back to ollama, reset model so ollama uses its own default
+		let effectiveSynthesisModel: string | undefined = memoryCfg.pipelineV2.synthesis.model;
+		if (effectiveSynthesisProvider === "ollama" && memoryCfg.pipelineV2.synthesis.provider !== "ollama") {
+			effectiveSynthesisModel = undefined;
+		}
+
 		const synthesisProvider =
 			effectiveSynthesisProvider === "anthropic"
 				? createAnthropicProvider({
-						model: memoryCfg.pipelineV2.synthesis.model || "haiku",
+						model: effectiveSynthesisModel || "haiku",
 						apiKey: anthropicApiKey ?? "",
 						defaultTimeoutMs: memoryCfg.pipelineV2.synthesis.timeout,
 					})
 				: effectiveSynthesisProvider === "opencode"
 					? createOpenCodeProvider({
-							model: memoryCfg.pipelineV2.synthesis.model || "anthropic/claude-haiku-4-5-20251001",
+							model: effectiveSynthesisModel || "anthropic/claude-haiku-4-5-20251001",
 							defaultTimeoutMs: memoryCfg.pipelineV2.synthesis.timeout,
 						})
 					: effectiveSynthesisProvider === "claude-code"
 						? createClaudeCodeProvider({
-								model: memoryCfg.pipelineV2.synthesis.model || "haiku",
+								model: effectiveSynthesisModel || "haiku",
 								defaultTimeoutMs: memoryCfg.pipelineV2.synthesis.timeout,
 							})
 						: createOllamaProvider({
-								model: memoryCfg.pipelineV2.synthesis.model || "qwen3:4b",
+								model: effectiveSynthesisModel || "qwen3:4b",
 								defaultTimeoutMs: memoryCfg.pipelineV2.synthesis.timeout,
 							});
 		initSynthesisProvider(synthesisProvider);
