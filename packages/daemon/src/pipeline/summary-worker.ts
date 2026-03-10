@@ -16,7 +16,7 @@ import { join } from "node:path";
 import type { Database } from "bun:sqlite";
 import type { DbAccessor } from "../db-accessor";
 import type { LlmProvider } from "@signet/core";
-import { createOllamaProvider, createClaudeCodeProvider, createCodexProvider, createOpenCodeProvider } from "./provider";
+import { createOllamaProvider, createClaudeCodeProvider, createOpenCodeProvider } from "./provider";
 
 import { isDuplicate, inferType } from "../hooks";
 import { loadMemoryConfig } from "../memory-config";
@@ -792,8 +792,6 @@ function resolveProvider(cfg: ReturnType<typeof loadMemoryConfig>): LlmProvider 
 	switch (p) {
 		case "claude-code":
 			return createClaudeCodeProvider({ model: model || "haiku", defaultTimeoutMs: timeout });
-		case "codex":
-			return createCodexProvider({ model: model || "gpt-5.3-codex", defaultTimeoutMs: timeout });
 		case "opencode":
 			return createOpenCodeProvider({ model: model || "anthropic/claude-haiku-4-5-20251001", defaultTimeoutMs: timeout });
 		default:
