@@ -319,7 +319,19 @@ async function daemonFetch<T>(
 
 		return (await res.json()) as T;
 	} catch (e) {
-		console.warn(`[signet] ${method} ${path} error:`, e);
+		const cause: unknown = e instanceof TypeError ? e.cause : undefined;
+		const isConnRefused =
+			typeof cause === "object" &&
+			cause !== null &&
+			"code" in cause &&
+			cause.code === "ECONNREFUSED";
+		if (isConnRefused) {
+			console.warn(
+				`[signet] daemon unreachable at ${daemonUrl} — is the Signet daemon running? (${method} ${path})`,
+			);
+		} else {
+			console.warn(`[signet] ${method} ${path} error:`, e);
+		}
 		return null;
 	}
 }
@@ -1339,6 +1351,11 @@ const signetPlugin = {
 				sessionKey,
 			});
 			if (!result) {
+				if (!daemonReachable) {
+					api.logger.warn(
+						"signet-memory: user-prompt-submit returned no result — daemon may be unreachable",
+					);
+				}
 				return undefined;
 			}
 			recentPromptTurns.set(promptTurnKey, Date.now());

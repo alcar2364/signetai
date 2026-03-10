@@ -12,8 +12,10 @@ import {
 	mkdirSync,
 	readFileSync,
 	readdirSync,
+	readlinkSync,
 	rmSync,
 	statSync,
+	symlinkSync,
 	writeFileSync,
 } from "fs";
 import { homedir, platform } from "os";
@@ -37,6 +39,7 @@ import {
 	ensureUnifiedSchema,
 	formatYaml,
 	getGlobalInstallCommand,
+	resolveGlobalPackagePath,
 	getMissingIdentityFiles,
 	getSkillsRunnerCommand,
 	hasValidIdentity,
@@ -544,12 +547,32 @@ async function configureHarnessHooks(
 				options?.openclawRuntimePath ??
 				connector.getConfiguredRuntimePath() ??
 				"plugin";
+			// Install connector first — writes config with runtimePath so
+			// ensureOpenClawPluginPackage's getConfiguredRuntimePath() check passes.
 			await connector.install(basePath, {
 				configureWorkspace: options?.configureOpenClawWorkspace ?? false,
 				runtimePath,
 			});
 			if (runtimePath === "plugin") {
 				await ensureOpenClawPluginPackage(basePath);
+				// Resolve the now-installed global path and re-patch config
+				// with plugins.load.paths as a discovery fallback.
+				const packageManager = resolvePrimaryPackageManager({
+					agentsDir: basePath,
+					env: process.env,
+				});
+				const globalPkgPath = resolveGlobalPackagePath(
+					packageManager.family,
+					OPENCLAW_PLUGIN_PACKAGE,
+				);
+				if (globalPkgPath) {
+					await connector.install(basePath, {
+						configureWorkspace: false,
+						configureHooks: false,
+						runtimePath,
+						globalPackagePath: globalPkgPath,
+					});
+				}
 			}
 			break;
 		}
@@ -681,7 +704,103 @@ async function ensureOpenClawPluginPackage(
 		);
 	}
 
+	// Symlink global package into OpenClaw's extensions directory so
+	// plugin discovery finds it without needing plugins.load.paths.
+	ensureOpenClawExtensionSymlink(packageManager.family, options.silent);
+
 	return true;
+}
+
+/**
+ * Create a symlink from OpenClaw's extensions directory to the globally
+ * installed plugin package. Idempotent — skips if already correct,
+ * updates if stale, creates if missing.
+ */
+function ensureOpenClawExtensionSymlink(
+	family: import("@signet/core").PackageManagerFamily,
+	silent?: boolean,
+): void {
+	const globalPath = resolveGlobalPackagePath(family, OPENCLAW_PLUGIN_PACKAGE);
+	if (!globalPath) {
+		if (!silent) {
+			console.log(
+				chalk.yellow("  Warning: could not resolve global package path for symlink"),
+			);
+		}
+		return;
+	}
+
+	// Discover the active OpenClaw state directory. Check env overrides first,
+	// then probe for existing legacy dirs (~/.clawdbot, ~/.moldbot, ~/.moltbot).
+	const stateDirCandidates: string[] = [];
+	if (process.env.OPENCLAW_STATE_DIR) {
+		stateDirCandidates.push(resolvePath(process.env.OPENCLAW_STATE_DIR));
+	}
+	if (process.env.CLAWDBOT_STATE_DIR) {
+		stateDirCandidates.push(resolvePath(process.env.CLAWDBOT_STATE_DIR));
+	}
+	const home = homedir();
+	for (const name of [".openclaw", ".clawdbot", ".moldbot", ".moltbot"]) {
+		const candidate = join(home, name);
+		if (existsSync(candidate)) {
+			stateDirCandidates.push(candidate);
+		}
+	}
+	// Default to ~/.openclaw if nothing else exists
+	if (stateDirCandidates.length === 0) {
+		stateDirCandidates.push(join(home, ".openclaw"));
+	}
+
+	// Create symlink in every discovered state dir
+	for (const stateDir of [...new Set(stateDirCandidates)]) {
+		createExtensionSymlink(stateDir, globalPath, silent);
+	}
+}
+
+function createExtensionSymlink(
+	stateDir: string,
+	globalPath: string,
+	silent?: boolean,
+): void {
+	const extensionsDir = join(stateDir, "extensions");
+	const symlinkPath = join(extensionsDir, "signet-memory-openclaw");
+
+	mkdirSync(extensionsDir, { recursive: true });
+
+	// Check existing symlink — lstatSync doesn't follow symlinks, so it
+	// catches both valid and broken symlinks. existsSync follows symlinks
+	// and misses broken ones.
+	try {
+		const stat = lstatSync(symlinkPath);
+		if (stat.isSymbolicLink()) {
+			const currentTarget = readlinkSync(symlinkPath);
+			if (currentTarget === globalPath) {
+				return; // Already correct
+			}
+			// Stale symlink — remove and recreate
+			rmSync(symlinkPath, { force: true });
+		} else {
+			// Exists but not a symlink — remove
+			rmSync(symlinkPath, { force: true, recursive: true });
+		}
+	} catch {
+		// Path doesn't exist — will create below
+	}
+
+	try {
+		symlinkSync(globalPath, symlinkPath, "dir");
+		if (!silent) {
+			console.log(
+				chalk.green("  ✓ OpenClaw extension symlink created"),
+			);
+		}
+	} catch (err) {
+		if (!silent) {
+			console.log(
+				chalk.yellow(`  Warning: could not create extension symlink: ${err}`),
+			);
+		}
+	}
 }
 
 /**

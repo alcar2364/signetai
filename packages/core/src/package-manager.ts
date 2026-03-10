@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { parseSimpleYaml } from "./yaml";
 
@@ -256,6 +257,73 @@ export function getSkillsRunnerCommand(
 				command: "npm",
 				args: ["exec", "--yes", "--", "skills", ...skillsArgs],
 			};
+	}
+}
+
+/**
+ * Resolve the filesystem path where a globally-installed package lives.
+ * Returns undefined if the path cannot be determined or does not exist.
+ */
+export function resolveGlobalPackagePath(
+	family: PackageManagerFamily,
+	packageName: string,
+): string | undefined {
+	try {
+		switch (family) {
+			case "bun": {
+				const bunGlobal = join(
+					process.env.BUN_INSTALL ?? join(homedir(), ".bun"),
+					"install",
+					"global",
+					"node_modules",
+					packageName,
+				);
+				if (existsSync(bunGlobal)) return bunGlobal;
+				return undefined;
+			}
+			case "npm": {
+				const result = spawnSync("npm", ["root", "-g"], {
+					encoding: "utf-8",
+					timeout: 10_000,
+					windowsHide: true,
+				});
+				if (result.status === 0 && result.stdout.trim()) {
+					const candidate = join(result.stdout.trim(), packageName);
+					if (existsSync(candidate)) return candidate;
+				}
+				return undefined;
+			}
+			case "pnpm": {
+				const result = spawnSync("pnpm", ["root", "-g"], {
+					encoding: "utf-8",
+					timeout: 10_000,
+					windowsHide: true,
+				});
+				if (result.status === 0 && result.stdout.trim()) {
+					const candidate = join(result.stdout.trim(), packageName);
+					if (existsSync(candidate)) return candidate;
+				}
+				return undefined;
+			}
+			case "yarn": {
+				const result = spawnSync("yarn", ["global", "dir"], {
+					encoding: "utf-8",
+					timeout: 10_000,
+					windowsHide: true,
+				});
+				if (result.status === 0 && result.stdout.trim()) {
+					const candidate = join(
+						result.stdout.trim(),
+						"node_modules",
+						packageName,
+					);
+					if (existsSync(candidate)) return candidate;
+				}
+				return undefined;
+			}
+		}
+	} catch {
+		return undefined;
 	}
 }
 

@@ -48,6 +48,9 @@ interface OpenClawConfigShape {
 			memory?: string;
 		};
 		entries?: Record<string, { enabled?: boolean; config?: Record<string, unknown> }>;
+		load?: {
+			paths?: string[];
+		};
 	};
 	agents?: {
 		defaults?: {
@@ -64,6 +67,9 @@ export interface OpenClawInstallOptions {
 	configureWorkspace?: boolean;
 	configureHooks?: boolean;
 	runtimePath?: "plugin" | "legacy";
+	/** Resolved filesystem path to the globally-installed plugin package.
+	 *  When provided, added to plugins.load.paths as a discovery fallback. */
+	globalPackagePath?: string;
 }
 
 /**
@@ -267,7 +273,7 @@ export class OpenClawConnector extends BaseConnector {
 
 		const configureHooks = options.configureHooks ?? true;
 		const configureWorkspace = options.configureWorkspace ?? true;
-		const runtimePath = options.runtimePath ?? "legacy";
+		const runtimePath = options.runtimePath ?? "plugin";
 
 		const patch: JsonObject = {};
 		if (configureWorkspace) {
@@ -319,7 +325,7 @@ export class OpenClawConnector extends BaseConnector {
 
 		if (Object.keys(patch).length > 0) {
 			if (runtimePath === "plugin") {
-				const pluginResult = this.patchAllConfigsWithPlugin(patch);
+				const pluginResult = this.patchAllConfigsWithPlugin(patch, options.globalPackagePath);
 				configsPatched.push(...pluginResult.patched);
 				warnings.push(...pluginResult.warnings);
 			} else {
@@ -664,7 +670,10 @@ export class OpenClawConnector extends BaseConnector {
 	 * - Top-level `signet: { daemonUrl }` key
 	 * - Old plugin name "signet-memory" -> "signet-memory-openclaw"
 	 */
-	private patchAllConfigsWithPlugin(patch: JsonObject): {
+	private patchAllConfigsWithPlugin(
+		patch: JsonObject,
+		globalPackagePath?: string,
+	): {
 		patched: string[];
 		warnings: string[];
 	} {
@@ -723,6 +732,19 @@ export class OpenClawConnector extends BaseConnector {
 					pluginsObj.entries = entriesObj;
 					config.plugins = pluginsObj;
 					config.signet = undefined;
+				}
+
+				// Add global package path to plugins.load.paths as a fallback
+				// for environments where the symlink can't be created (Docker, perms).
+				if (globalPackagePath) {
+					const pluginsObj = (config.plugins ?? {}) as JsonObject;
+					const loadObj = (pluginsObj.load ?? {}) as JsonObject;
+					const existingPaths = Array.isArray(loadObj.paths) ? (loadObj.paths as string[]) : [];
+					if (!existingPaths.includes(globalPackagePath)) {
+						loadObj.paths = [...existingPaths, globalPackagePath];
+						pluginsObj.load = loadObj;
+						config.plugins = pluginsObj;
+					}
 				}
 
 				deepMerge(config, patch);
