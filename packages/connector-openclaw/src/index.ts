@@ -826,11 +826,11 @@ export class OpenClawConnector extends BaseConnector {
 				}
 				const loadObj = isJsonObject(rawLoad) ? rawLoad : {};
 				const rawPaths = loadObj.paths;
-				const existingPaths =
-					Array.isArray(rawPaths) &&
-					rawPaths.every((entry): entry is string => typeof entry === "string")
-						? rawPaths
-						: [];
+				// filter (not every) so valid string entries are preserved even
+				// if the array contains a stray non-string element.
+				const existingPaths = Array.isArray(rawPaths)
+					? rawPaths.filter((entry): entry is string => typeof entry === "string")
+					: [];
 
 				if (!existingPaths.includes(searchPath)) {
 					loadObj.paths = [...existingPaths, searchPath];

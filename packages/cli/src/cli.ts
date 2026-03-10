@@ -561,7 +561,10 @@ async function configureHarnessHooks(
 				if (globalPkgPath) {
 					// dirname gives the parent search directory (e.g. …/@signetai/)
 					// that OpenClaw scans for "signet-memory-openclaw" subdirectory.
-					connector.patchLoadPaths(dirname(globalPkgPath));
+					const { warnings: loadPathWarnings } = connector.patchLoadPaths(dirname(globalPkgPath));
+					for (const w of loadPathWarnings) {
+						console.warn(w);
+					}
 				}
 			}
 			break;
@@ -776,7 +779,18 @@ function createExtensionSymlink(
 	const extensionsDir = join(stateDir, "extensions");
 	const symlinkPath = join(extensionsDir, "signet-memory-openclaw");
 
-	mkdirSync(extensionsDir, { recursive: true });
+	try {
+		mkdirSync(extensionsDir, { recursive: true });
+	} catch (err) {
+		if (!silent) {
+			console.log(
+				chalk.yellow(
+					`  Warning: could not prepare OpenClaw extensions dir at ${extensionsDir}: ${err}`,
+				),
+			);
+		}
+		return;
+	}
 
 	// Check existing symlink — lstatSync doesn't follow symlinks, so it
 	// catches both valid and broken symlinks. existsSync follows symlinks
