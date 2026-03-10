@@ -286,6 +286,20 @@ describe("loadPipelineConfig", () => {
 		expect(result.extraction.model).not.toBe("gpt-5.3-codex");
 	});
 
+	it("flat model without flat provider is honoured (not silently discarded)", () => {
+		const result = loadPipelineConfig({
+			memory: {
+				pipelineV2: {
+					extractionModel: "qwen3:8b",
+				},
+			},
+		});
+
+		// No provider set → defaults to "ollama"; flat model must propagate
+		expect(result.extraction.provider).toBe("ollama");
+		expect(result.extraction.model).toBe("qwen3:8b");
+	});
+
 	it("nested provider used when no flat key is set", () => {
 		const result = loadPipelineConfig({
 			memory: {

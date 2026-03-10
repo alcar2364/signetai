@@ -260,14 +260,18 @@ export function loadPipelineConfig(
 	}
 
 	const flatProviderWon = isValidProvider(flatProvider);
+	// Model-only flat key: no provider set anywhere, but extractionModel is
+	// present.  Default to "ollama" so the model isn't silently discarded.
+	const flatModelOnly =
+		!flatProviderWon &&
+		!isValidProvider(nestedProvider) &&
+		typeof flatModel === "string";
 	const resolvedProvider: ProviderKind =
 		flatProviderWon
 			? flatProvider
 			: isValidProvider(nestedProvider)
 				? nestedProvider
-				: typeof flatModel === "string" &&
-					  nestedProvider === undefined &&
-					  flatProvider === undefined
+				: flatModelOnly
 					? "ollama"
 					: d.extraction.provider;
 
@@ -292,7 +296,9 @@ export function loadPipelineConfig(
 				? (typeof flatModel === "string" ? flatModel : d.extraction.model)
 				: typeof extractionRaw?.model === "string"
 					? extractionRaw.model
-					: d.extraction.model,
+					: flatModelOnly
+						? flatModel
+						: d.extraction.model,
 			timeout: clampPositive(
 				extractionRaw?.timeout ?? raw.extractionTimeout,
 				5000,
