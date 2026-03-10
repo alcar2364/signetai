@@ -2,6 +2,28 @@
 
 All notable changes to Signet are documented here.
 
+## [0.53.1] - 2026-03-10
+
+### Bug Fixes
+
+- honour extractionModel flat key when no provider is set
+- eliminate double config load and cap requeue batch budget
+- remove stale flat-model leak and merge requeue into single tx
+- **pipeline**: pass memoryCfg to scoreContinuity, add maxTokens
+- **pipeline**: add .catch() guards to callClaude stream reads
+- **pipeline**: replace deleted LLM_TIMEOUT_MS with synthesis config
+- **pipeline**: pass maxTokens and timeout to summary LLM calls
+- **pipeline**: indent withSemaphore callback bodies
+- **pipeline**: remove unused now variable in summary requeue
+- **pipeline**: NaN deadlock guard, remove dead codex synthesis case
+- **pipeline**: semaphore env var edge case, summary uses synthesis config
+- **pipeline**: address bot review feedback on PR #180
+- **pipeline**: global concurrency limiter and summary job requeue (#181)
+- **pipeline**: address second round of PR #180 review comments
+- **pipeline**: address PR #180 review comments
+- **pipeline**: config resolution pairing, codex error capture, DAG upsert
+
+
 ## [0.53.0] - 2026-03-09
 
 ### Bug Fixes
