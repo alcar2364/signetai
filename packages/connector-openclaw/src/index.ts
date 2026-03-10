@@ -804,6 +804,18 @@ export class OpenClawConnector extends BaseConnector {
 				const config = parseJsonOrJson5(raw);
 				const indent = this.detectIndent(raw);
 
+				// Legacy configs store plugins as an array of strings. The
+				// install() call migrates these to object form before patchLoadPaths
+				// is called in the normal CLI flow, but guard explicitly so a direct
+				// SDK caller against an unmigrated config doesn't silently produce a
+				// no-op (JSON.stringify drops non-index array properties).
+				if (Array.isArray(config.plugins)) {
+					const warning = `[signet/openclaw] Skipped load.paths patch for ${configPath}: plugins is in legacy array format; run install() first`;
+					warnings.push(warning);
+					console.warn(warning);
+					continue;
+				}
+
 				const pluginsObj = (config.plugins ?? {}) as JsonObject;
 				const loadObj = (pluginsObj.load ?? {}) as JsonObject;
 				const rawPaths = loadObj.paths;

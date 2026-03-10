@@ -785,10 +785,24 @@ function createExtensionSymlink(
 				return; // Already correct
 			}
 			// Stale symlink — remove and recreate
-			rmSync(symlinkPath, { force: true });
+			try {
+				rmSync(symlinkPath, { force: true });
+			} catch (rmErr) {
+				if (!silent) {
+					console.log(chalk.yellow(`  Warning: could not remove stale symlink at ${symlinkPath}: ${rmErr}`));
+				}
+				return;
+			}
 		} else {
 			// Exists but not a symlink — remove
-			rmSync(symlinkPath, { force: true, recursive: true });
+			try {
+				rmSync(symlinkPath, { force: true, recursive: true });
+			} catch (rmErr) {
+				if (!silent) {
+					console.log(chalk.yellow(`  Warning: could not remove existing path at ${symlinkPath}: ${rmErr}`));
+				}
+				return;
+			}
 		}
 	} catch {
 		// Path doesn't exist — will create below

@@ -332,7 +332,13 @@ export function resolveGlobalPackagePath(
 						if (existsSync(candidate)) return candidate;
 					}
 				} else {
-					// Berry defaults to ~/.yarn/berry/global; respects YARN_GLOBAL_FOLDER
+					// Yarn Berry (v2+) removed `yarn global add` entirely, so no
+					// global package tree is created under the default linker (PnP).
+					// This path only resolves for Berry users who explicitly set
+					// `nodeLinker: node-modules` in their .yarnrc.yml — PnP installs
+					// will not have a node_modules directory here. Checked as a
+					// best-effort fallback; callers should warn when this returns
+					// undefined, since Berry users may need an alternative install path.
 					const berryGlobal = join(
 						process.env.YARN_GLOBAL_FOLDER ??
 							join(homedir(), ".yarn", "berry", "global"),
