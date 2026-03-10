@@ -261,6 +261,12 @@ export class OpenClawConnector extends BaseConnector {
 	 * - Patches OpenClaw hook entries by default
 	 * - Patches OpenClaw workspace only when explicitly requested
 	 * - Installs hook handler files under `<basePath>/hooks/agent-memory/`
+	 *
+	 * **`runtimePath` default changed in 0.53:** The default is now `"plugin"`
+	 * (automatic per-prompt memory injection via the OpenClaw plugin system)
+	 * instead of the old `"legacy"` (manual `/remember`/`/recall` commands
+	 * only). SDK callers that relied on the legacy path must now pass
+	 * `{ runtimePath: "legacy" }` explicitly.
 	 */
 	async install(basePath: string, options: OpenClawInstallOptions = {}): Promise<InstallResult> {
 		const expandedBasePath = this.expandPath(basePath);

@@ -664,7 +664,15 @@ async function ensureOpenClawPluginPackage(
 	if (!options.force && readOpenClawPluginSyncVersion(basePath) === VERSION) {
 		// Cached — skip re-install but still resolve and return path for caller
 		const cachedPath = resolveGlobalPackagePath(packageManager.family, OPENCLAW_PLUGIN_PACKAGE);
-		if (cachedPath) ensureOpenClawExtensionSymlink(cachedPath, options.silent);
+		if (cachedPath) {
+			ensureOpenClawExtensionSymlink(cachedPath, options.silent);
+		} else if (!options.silent) {
+			console.log(
+				chalk.yellow(
+					`  Warning: could not resolve global path for ${OPENCLAW_PLUGIN_PACKAGE}; plugin discovery may be incomplete. Run 'signet setup' again if needed.`,
+				),
+			);
+		}
 		return cachedPath;
 	}
 
@@ -700,7 +708,15 @@ async function ensureOpenClawPluginPackage(
 
 	// Resolve once and reuse for both symlink creation and load.paths patch.
 	const globalPath = resolveGlobalPackagePath(packageManager.family, OPENCLAW_PLUGIN_PACKAGE);
-	if (globalPath) ensureOpenClawExtensionSymlink(globalPath, options.silent);
+	if (globalPath) {
+		ensureOpenClawExtensionSymlink(globalPath, options.silent);
+	} else if (!options.silent) {
+		console.log(
+			chalk.yellow(
+				`  Warning: could not resolve global path for ${OPENCLAW_PLUGIN_PACKAGE} after install; plugin discovery may be incomplete. Run 'signet setup' again if needed.`,
+			),
+		);
+	}
 	return globalPath;
 }
 
