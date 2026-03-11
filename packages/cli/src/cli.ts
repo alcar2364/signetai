@@ -561,10 +561,9 @@ async function configureHarnessHooks(
 				if (globalPkgPath) {
 					// dirname gives the parent search directory (e.g. …/@signetai/)
 					// that OpenClaw scans for "signet-memory-openclaw" subdirectory.
-					const { warnings: loadPathWarnings } = connector.patchLoadPaths(dirname(globalPkgPath));
-					for (const w of loadPathWarnings) {
-						console.warn(w);
-					}
+					// patchLoadPaths already calls console.warn internally for each
+					// skipped config (same pattern as sibling private methods).
+					connector.patchLoadPaths(dirname(globalPkgPath));
 				}
 			}
 			break;
