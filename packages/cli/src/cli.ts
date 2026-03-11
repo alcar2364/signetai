@@ -4024,7 +4024,7 @@ async function ensureDaemonForSecrets(): Promise<boolean> {
 	return true;
 }
 
-const secretCmd = program.command("secret").description("Manage encrypted secrets");
+const secretCmd = program.command("secret").description("Manage encrypted secrets").enablePositionalOptions();
 
 secretCmd
 	.command("put <name> [value]")
