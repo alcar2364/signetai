@@ -4059,7 +4059,13 @@ secretCmd
 			// code is null when the child was killed by a signal — treat as failure.
 			process.exitCode = result.code ?? 1;
 		} catch (e) {
-			console.error(chalk.red(`  Error: ${(e as Error).message}`));
+			if (e instanceof Error && e.name === "TimeoutError") {
+				console.error(chalk.red("  Error: command timed out after 60 seconds."));
+				console.error(chalk.dim("  The subprocess may still be running on the daemon."));
+				console.error(chalk.dim("  Streaming support is planned — see TODO in source."));
+			} else {
+				console.error(chalk.red(`  Error: ${(e as Error).message}`));
+			}
 			process.exitCode = 1;
 		}
 	});
