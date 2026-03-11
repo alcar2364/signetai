@@ -768,8 +768,9 @@ compatibility (nested keys take precedence).
 enabled                         true
 shadowMode                      false
 mutationsFrozen                 false
-semanticContradictionEnabled    false
-telemetryEnabled                false
+semanticContradictionEnabled        false
+semanticContradictionTimeoutMs      45000   # ms, range 5000–300000
+telemetryEnabled                    false
 ```
 
 ### Nested sub-objects and defaults

@@ -1138,7 +1138,9 @@ export function startWorker(
 				if (proposal.action !== "update" || !proposal.targetContent) continue;
 
 				// Only run semantic check when syntactic check returned false
-				// and there's enough lexical overlap to suggest related content
+				// and there's enough lexical overlap to suggest related content.
+				// Threshold >= 3 avoids the slow LLM path for loosely-related memories
+				// (1-2 shared tokens are often stopword noise). Matches contradiction.ts.
 				const factTokens = tokenize(proposal.fact.content);
 				const targetTokens = tokenize(proposal.targetContent);
 				const overlap = overlapCount(factTokens, targetTokens);
