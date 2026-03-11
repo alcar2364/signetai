@@ -65,3 +65,5 @@ web/.dev.vars*
 packages/predictor/target/
 
 marketing/
+.bun-tmp/
+.claude/
