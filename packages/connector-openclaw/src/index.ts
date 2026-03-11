@@ -824,6 +824,15 @@ export class OpenClawConnector extends BaseConnector {
 					console.warn(warning);
 					continue;
 				}
+				if (rawLoad !== undefined && !isJsonObject(rawLoad)) {
+					// Scalar values (false, "disabled", 0, etc.) likely represent an
+					// intentional opt-out — overwriting them silently could change
+					// deliberate user config.
+					const warning = `[signet/openclaw] Skipped load.paths patch for ${configPath}: plugins.load has unexpected type (${typeof rawLoad}); cannot safely merge`;
+					warnings.push(warning);
+					console.warn(warning);
+					continue;
+				}
 				const loadObj = isJsonObject(rawLoad) ? rawLoad : {};
 				const rawPaths = loadObj.paths;
 				// filter (not every) so valid string entries are preserved even

@@ -319,7 +319,9 @@ async function daemonFetch<T>(
 
 		return (await res.json()) as T;
 	} catch (e) {
-		const cause: unknown = e instanceof TypeError ? e.cause : undefined;
+		// Native fetch wraps OS errors as TypeError.cause, but polyfill/proxy
+		// layers may rethrow the OS error directly — check both forms.
+		const cause: unknown = e instanceof TypeError ? e.cause : e;
 		const isConnRefused =
 			typeof cause === "object" &&
 			cause !== null &&
