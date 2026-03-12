@@ -17,8 +17,17 @@ function loadIndex(): number {
 	if (typeof localStorage === "undefined") return DEFAULT_INDEX;
 	const stored = localStorage.getItem(STORAGE_KEY);
 	if (stored !== null) {
-		const n = Number(stored);
-		if (Number.isInteger(n) && n >= 0 && n < STEPS.length) return n;
+		const v = parseFloat(stored);
+		if (!isNaN(v)) {
+			// Exact match first
+			const exact = (STEPS as readonly number[]).indexOf(v);
+			if (exact !== -1) return exact;
+			// Nearest match — handles old index-based values and future STEPS changes
+			return STEPS.reduce(
+				(best, s, i) => (Math.abs(s - v) < Math.abs(STEPS[best] - v) ? i : best),
+				DEFAULT_INDEX,
+			);
+		}
 	}
 	return DEFAULT_INDEX;
 }
@@ -58,7 +67,7 @@ export const uiScale = {
 			index++;
 			applyScale();
 			if (typeof localStorage !== "undefined") {
-				localStorage.setItem(STORAGE_KEY, String(index));
+				localStorage.setItem(STORAGE_KEY, String(STEPS[index]));
 			}
 		}
 	},
@@ -67,7 +76,7 @@ export const uiScale = {
 			index--;
 			applyScale();
 			if (typeof localStorage !== "undefined") {
-				localStorage.setItem(STORAGE_KEY, String(index));
+				localStorage.setItem(STORAGE_KEY, String(STEPS[index]));
 			}
 		}
 	},
@@ -75,7 +84,7 @@ export const uiScale = {
 		index = DEFAULT_INDEX;
 		applyScale();
 		if (typeof localStorage !== "undefined") {
-			localStorage.setItem(STORAGE_KEY, String(index));
+			localStorage.setItem(STORAGE_KEY, String(STEPS[index]));
 		}
 	},
 	/** Call from a wheel handler to zoom with Ctrl+scroll */
