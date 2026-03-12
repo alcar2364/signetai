@@ -115,6 +115,21 @@ describe("createOllamaProvider", () => {
 		expect((capturedBody.options as Record<string, unknown>)?.num_predict).toBe(100);
 	});
 
+	it("generate() sends maxContextTokens as num_ctx", async () => {
+		let capturedBody: Record<string, unknown> = {};
+		mockFetch(async (_url, init) => {
+			capturedBody = JSON.parse(init?.body as string);
+			return Response.json({ response: "ok" });
+		});
+
+		const provider = createOllamaProvider({
+			model: "test-model",
+			maxContextTokens: 4096,
+		});
+		await provider.generate("test");
+		expect((capturedBody.options as Record<string, unknown>)?.num_ctx).toBe(4096);
+	});
+
 	it("available() returns true when /api/tags responds 200", async () => {
 		mockFetch(() => Response.json({ models: [] }));
 
@@ -508,6 +523,7 @@ describe("createOpenCodeProvider", () => {
 
 	it("uses configured ollama fallback base URL for OpenCode fallback", async () => {
 		const seenUrls: string[] = [];
+		let fallbackBody: Record<string, unknown> | null = null;
 		mockFetch(async (url, init) => {
 			seenUrls.push(url);
 			if (url.includes("/session") && !url.includes("/message")) {
@@ -538,6 +554,7 @@ describe("createOpenCodeProvider", () => {
 				return Response.json({ models: [] });
 			}
 			if (url === "http://172.17.0.1:11434/api/generate") {
+				fallbackBody = JSON.parse(init?.body as string) as Record<string, unknown>;
 				return Response.json({ response: '{"facts":[],"entities":[]}' });
 			}
 			return new Response("unexpected url", { status: 500 });
@@ -547,10 +564,14 @@ describe("createOpenCodeProvider", () => {
 			baseUrl: "http://localhost:9999",
 			enableOllamaFallback: true,
 			ollamaFallbackBaseUrl: "http://172.17.0.1:11434",
+			ollamaFallbackMaxContextTokens: 2048,
 		});
 		const result = await provider.generate("test", { timeoutMs: 250 });
 		expect(result).toBe('{"facts":[],"entities":[]}');
 		expect(seenUrls).toContain("http://172.17.0.1:11434/api/tags");
 		expect(seenUrls).toContain("http://172.17.0.1:11434/api/generate");
+		expect(
+			((fallbackBody?.options as Record<string, unknown> | undefined)?.num_ctx),
+		).toBe(2048);
 	});
 });

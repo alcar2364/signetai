@@ -162,16 +162,42 @@ export async function generateWithTracking(
 // ---------------------------------------------------------------------------
 
 export interface OllamaProviderConfig {
-	readonly model: string;
+	readonly model?: string;
 	readonly baseUrl: string;
 	readonly defaultTimeoutMs: number;
+	readonly maxContextTokens?: number;
 }
 
-const DEFAULT_OLLAMA_CONFIG: OllamaProviderConfig = {
-	model: "qwen3:4b",
+export const DEFAULT_OLLAMA_FALLBACK_MODEL = "llama3.2:3b";
+export const DEFAULT_OLLAMA_FALLBACK_MAX_CONTEXT_TOKENS = 8192;
+
+const DEFAULT_OLLAMA_CONFIG = {
 	baseUrl: "http://127.0.0.1:11434",
 	defaultTimeoutMs: 90000,
 };
+
+function parseOptionalPositiveInt(raw: string | undefined): number | undefined {
+	if (typeof raw !== "string") return undefined;
+	const parsed = Number.parseInt(raw, 10);
+	if (!Number.isFinite(parsed) || parsed <= 0) return undefined;
+	return parsed;
+}
+
+export function resolveDefaultOllamaFallbackModel(): string {
+	const raw = process.env.SIGNET_OLLAMA_FALLBACK_MODEL;
+	if (typeof raw === "string") {
+		const trimmed = raw.trim();
+		if (trimmed.length > 0) return trimmed;
+	}
+	return DEFAULT_OLLAMA_FALLBACK_MODEL;
+}
+
+export function resolveDefaultOllamaFallbackMaxContextTokens(): number {
+	return (
+		parseOptionalPositiveInt(process.env.SIGNET_OLLAMA_FALLBACK_MAX_CTX)
+		?? DEFAULT_OLLAMA_FALLBACK_MAX_CONTEXT_TOKENS
+	);
+}
 
 function trimTrailingSlash(url: string): string {
 	return url.endsWith("/") ? url.slice(0, -1) : url;
@@ -188,8 +214,18 @@ interface OllamaGenerateResponse {
 export function createOllamaProvider(
 	config?: Partial<OllamaProviderConfig>,
 ): LlmProvider {
-	const merged = { ...DEFAULT_OLLAMA_CONFIG, ...config };
-	const cfg = { ...merged, baseUrl: trimTrailingSlash(merged.baseUrl) };
+	const rawModel = config?.model;
+	const model =
+		typeof rawModel === "string" && rawModel.trim().length > 0
+			? rawModel.trim()
+			: resolveDefaultOllamaFallbackModel();
+	const cfg = {
+		baseUrl: trimTrailingSlash(config?.baseUrl ?? DEFAULT_OLLAMA_CONFIG.baseUrl),
+		defaultTimeoutMs:
+			config?.defaultTimeoutMs ?? DEFAULT_OLLAMA_CONFIG.defaultTimeoutMs,
+		maxContextTokens: config?.maxContextTokens,
+		model,
+	};
 
 	async function callOllama(
 		prompt: string,
@@ -201,6 +237,11 @@ export function createOllamaProvider(
 		const timer = setTimeout(() => controller.abort(), timeoutMs);
 
 		try {
+			const options: Record<string, number> = {};
+			if (opts?.maxTokens) options.num_predict = opts.maxTokens;
+			if (typeof cfg.maxContextTokens === "number") {
+				options.num_ctx = cfg.maxContextTokens;
+			}
 			const res = await fetch(`${cfg.baseUrl}/api/generate`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
@@ -208,7 +249,7 @@ export function createOllamaProvider(
 					model: cfg.model,
 					prompt,
 					stream: false,
-					...(opts?.maxTokens ? { options: { num_predict: opts.maxTokens } } : {}),
+					...(Object.keys(options).length > 0 ? { options } : {}),
 				}),
 				signal: controller.signal,
 			});
@@ -940,8 +981,9 @@ export interface OpenCodeProviderConfig {
 	readonly model: string;
 	readonly defaultTimeoutMs: number;
 	readonly enableOllamaFallback: boolean;
-	readonly ollamaFallbackModel: string;
+	readonly ollamaFallbackModel?: string;
 	readonly ollamaFallbackBaseUrl: string;
+	readonly ollamaFallbackMaxContextTokens?: number;
 }
 
 const DEFAULT_OPENCODE_CONFIG: OpenCodeProviderConfig = {
@@ -949,8 +991,9 @@ const DEFAULT_OPENCODE_CONFIG: OpenCodeProviderConfig = {
 	model: "anthropic/claude-haiku-4-5-20251001",
 	defaultTimeoutMs: 60000,
 	enableOllamaFallback: true,
-	ollamaFallbackModel: "qwen3:4b",
+	ollamaFallbackModel: undefined,
 	ollamaFallbackBaseUrl: "http://127.0.0.1:11434",
+	ollamaFallbackMaxContextTokens: undefined,
 };
 
 /**
@@ -1210,10 +1253,22 @@ export function createOpenCodeProvider(
 	config?: Partial<OpenCodeProviderConfig>,
 ): LlmProvider {
 	const merged = { ...DEFAULT_OPENCODE_CONFIG, ...config };
+	const rawFallbackModel = merged.ollamaFallbackModel;
+	const ollamaFallbackModel =
+		typeof rawFallbackModel === "string" &&
+			rawFallbackModel.trim().length > 0
+			? rawFallbackModel.trim()
+			: resolveDefaultOllamaFallbackModel();
+	const ollamaFallbackMaxContextTokens =
+		typeof merged.ollamaFallbackMaxContextTokens === "number"
+			? merged.ollamaFallbackMaxContextTokens
+			: resolveDefaultOllamaFallbackMaxContextTokens();
 	const cfg = {
 		...merged,
 		baseUrl: trimTrailingSlash(merged.baseUrl),
 		ollamaFallbackBaseUrl: trimTrailingSlash(merged.ollamaFallbackBaseUrl),
+		ollamaFallbackModel,
+		ollamaFallbackMaxContextTokens,
 	};
 
 	// Parse "provider/model" format (e.g. "anthropic/claude-haiku-4-5-20251001")
@@ -1230,6 +1285,7 @@ export function createOpenCodeProvider(
 			model: cfg.ollamaFallbackModel,
 			baseUrl: cfg.ollamaFallbackBaseUrl,
 			defaultTimeoutMs: cfg.defaultTimeoutMs,
+			maxContextTokens: cfg.ollamaFallbackMaxContextTokens,
 		});
 		return ollamaFallbackProvider;
 	}
@@ -1261,6 +1317,12 @@ export function createOpenCodeProvider(
 			let inputTokens: number | null = null;
 			let outputTokens: number | null = null;
 			try {
+				const options: Record<string, number> = {
+					num_predict: fallbackOpts.maxTokens,
+				};
+				if (typeof cfg.ollamaFallbackMaxContextTokens === "number") {
+					options.num_ctx = cfg.ollamaFallbackMaxContextTokens;
+				}
 				const res = await fetch(`${cfg.ollamaFallbackBaseUrl}/api/generate`, {
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
@@ -1270,7 +1332,7 @@ export function createOpenCodeProvider(
 						stream: false,
 						format: "json",
 						think: false,
-						options: { num_predict: fallbackOpts.maxTokens },
+						options,
 					}),
 					signal: controller.signal,
 				});
