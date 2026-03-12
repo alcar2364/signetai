@@ -475,13 +475,13 @@ onMount(() => {
 			<div class="add-form-row">
 				<Input
 					type="text"
-					class="add-input"
+					class="secrets-add-input"
 					bind:value={newSecretName}
 					placeholder="SECRET_NAME"
 				/>
 				<Input
 					type="password"
-					class="add-input"
+					class="secrets-add-input"
 					bind:value={newSecretValue}
 					placeholder="value"
 				/>
@@ -524,7 +524,7 @@ onMount(() => {
 							onkeydown={(e) => handleSecretItemKeydown(e, index)}
 							onfocus={() => handleSecretItemFocus(index)}
 						>
-							<KeyRound class="secret-icon" />
+							<KeyRound class="secrets-secret-icon" />
 							<span class="secret-name">{name}</span>
 							<span class="secret-mask">········</span>
 							<button
@@ -552,15 +552,17 @@ onMount(() => {
 					class="panel-header panel-header--toggle"
 					onclick={() => {
 						onePasswordExpanded = !onePasswordExpanded;
-						if (!onePasswordExpanded) focusedOnePasswordInput = -1;
+						if (!onePasswordExpanded) {
+							focusedOnePasswordInput = -1;
+							focusArea = "list";
+						}
 					}}
 					aria-expanded={onePasswordExpanded}
-					aria-controls="op-panel"
 				>
 					{#if onePasswordExpanded}
-						<ChevronDown class="panel-chevron" />
+						<ChevronDown class="secrets-panel-chevron" />
 					{:else}
-						<ChevronRight class="panel-chevron" />
+						<ChevronRight class="secrets-panel-chevron" />
 					{/if}
 					<span class="panel-label">1Password</span>
 					<span class="panel-status" style="color: {onePasswordStatusColor}">
@@ -578,7 +580,7 @@ onMount(() => {
 			</div>
 
 			{#if onePasswordExpanded}
-				<div id="op-panel" class="onepassword-panel" onkeydown={handleOnePasswordPanelKeydown}>
+				<div class="onepassword-panel" onkeydown={handleOnePasswordPanelKeydown}>
 					<!-- Status message -->
 					{#if onePasswordStatus.connected}
 						<div class="op-status op-status--ok">
@@ -599,7 +601,7 @@ onMount(() => {
 						<Input
 							type="password"
 							data-focus-index="0"
-							class="op-input"
+							class="secrets-op-input"
 							bind:value={onePasswordToken}
 							placeholder={onePasswordStatus.connected
 								? "Replace service account token"
@@ -625,7 +627,7 @@ onMount(() => {
 							<Input
 								type="text"
 								data-focus-index="1"
-								class="op-input-sm"
+								class="secrets-op-input-sm"
 								bind:value={onePasswordImportOptions.prefix}
 								placeholder="OP"
 								onfocus={() => handleOnePasswordInputFocus(1)}
@@ -635,7 +637,7 @@ onMount(() => {
 							<Checkbox
 								id="op-overwrite"
 								bind:checked={onePasswordImportOptions.overwrite}
-								class="op-checkbox"
+								class="secrets-op-checkbox"
 							/>
 							<span class="op-option-label">OVERWRITE</span>
 						</label>
@@ -651,7 +653,7 @@ onMount(() => {
 										<Checkbox
 											checked={selectedVaultIds.includes(vault.id)}
 											onCheckedChange={() => toggleVaultSelection(vault.id)}
-											class="op-checkbox"
+											class="secrets-op-checkbox"
 										/>
 										<span class="op-vault-name">{vault.name}</span>
 									</label>
@@ -780,7 +782,7 @@ onMount(() => {
 		align-items: center;
 	}
 
-	:global(.add-input) {
+	:global(.secrets-add-input) {
 		flex: 1;
 		font-family: var(--font-mono) !important;
 		font-size: 11px !important;
@@ -894,7 +896,7 @@ onMount(() => {
 		border-radius: 50%;
 	}
 
-	:global(.panel-chevron) {
+	:global(.secrets-panel-chevron) {
 		width: 12px;
 		height: 12px;
 		flex-shrink: 0;
@@ -998,7 +1000,7 @@ onMount(() => {
 		border-left: 2px solid var(--sig-highlight);
 	}
 
-	:global(.secret-icon) {
+	:global(.secrets-secret-icon) {
 		width: 12px;
 		height: 12px;
 		color: var(--sig-highlight);
@@ -1084,7 +1086,7 @@ onMount(() => {
 		align-items: center;
 	}
 
-	:global(.op-input) {
+	:global(.secrets-op-input) {
 		flex: 1;
 		font-family: var(--font-mono) !important;
 		font-size: 11px !important;
@@ -1156,7 +1158,7 @@ onMount(() => {
 		color: var(--sig-text-muted);
 	}
 
-	:global(.op-input-sm) {
+	:global(.secrets-op-input-sm) {
 		width: 60px !important;
 		font-family: var(--font-mono) !important;
 		font-size: 10px !important;
@@ -1166,7 +1168,7 @@ onMount(() => {
 		height: 24px !important;
 	}
 
-	:global(.op-checkbox) {
+	:global(.secrets-op-checkbox) {
 		width: 14px !important;
 		height: 14px !important;
 		border-color: var(--sig-border-strong) !important;
