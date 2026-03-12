@@ -2,6 +2,25 @@
 
 All notable changes to Signet are documented here.
 
+## [0.55.0] - 2026-03-12
+
+### Features
+
+- custom window decorations and UI scaling for Tauri desktop app
+
+### Bug Fixes
+
+- inline wheel modifier check and guard old index-based localStorage values
+- store scale value instead of index in localStorage for ui-scale
+- address CodeRabbit/Greptile round-2 feedback on WindowTitlebar
+- add aria-labels to zoom buttons and SSR guard localStorage writes
+- address CodeRabbit review feedback on window-decorations PR
+
+### Performance
+
+- replace polling with onResized event listener in WindowTitlebar
+
+
 ## [0.54.2] - 2026-03-12
 
 ### Features
