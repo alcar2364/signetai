@@ -2,6 +2,27 @@
 
 All notable changes to Signet are documented here.
 
+## [0.54.2] - 2026-03-12
+
+### Features
+
+- dashboard UI polish — readout panel design language
+
+### Bug Fixes
+
+- add focus-visible styles to refresh and action buttons in SuggestedInsights
+- address greptile/coderabbit CSS regression from class rename
+- address greptile review feedback on SecretsTab
+- address coderabbit review feedback on dashboard UI PR
+- address greptile review feedback on dashboard UI PR
+
+### Docs
+
+- add desire paths epic with 15 stories across 5 phases
+- update RESEARCH-LCM-ACP.md frontmatter
+- add GitNexus pattern analysis and integrate into architecture docs
+
+
 ## [0.54.1] - 2026-03-11
 
 ### Bug Fixes
