@@ -2061,7 +2061,7 @@ export function handleSessionEnd(req: SessionEndRequest): SessionEndResponse {
 	if (req.transcriptPath && existsSync(req.transcriptPath)) {
 		try {
 			const rawTranscript = readFileSync(req.transcriptPath, "utf-8");
-			transcript = req.harness === "codex" ? normalizeCodexTranscript(rawTranscript) : rawTranscript;
+			transcript = normalizeSessionTranscript(req.harness, rawTranscript);
 		} catch {
 			logger.warn("hooks", "Could not read transcript", {
 				path: req.transcriptPath,
@@ -2111,16 +2111,12 @@ export function handleSessionEnd(req: SessionEndRequest): SessionEndResponse {
 		return { memoriesSaved: 0 };
 	}
 
-	// Truncate long transcripts for the LLM
-	const maxChars = 12000;
-	const truncated = transcript.length > maxChars ? `${transcript.slice(0, maxChars)}\n[truncated]` : transcript;
-
 	// Queue for async processing by the summary worker instead of
 	// blocking on LLM inference. The worker produces both a dated
 	// markdown summary and atomic fact rows.
 	const jobId = enqueueSummaryJob(getDbAccessor(), {
 		harness: req.harness,
-		transcript: truncated,
+		transcript,
 		sessionKey,
 		project: req.cwd,
 	});
@@ -2139,11 +2135,108 @@ export function handleSessionEnd(req: SessionEndRequest): SessionEndResponse {
 		sessionKey,
 		transcriptPath: req.transcriptPath,
 		transcriptChars: transcript.length,
-		queuedChars: truncated.length,
-		transcript: truncated,
+		queuedChars: transcript.length,
+		transcript,
 	});
 
 	return { memoriesSaved: 0, queued: true, jobId };
+}
+
+function normalizeSessionTranscript(harness: string, raw: string): string {
+	if (harness === "codex") {
+		return normalizeCodexTranscript(raw);
+	}
+
+	const normalizedJson = normalizeJsonConversationTranscript(raw);
+	if (normalizedJson.length > 0) {
+		return normalizedJson;
+	}
+
+	return raw;
+}
+
+function normalizeJsonConversationTranscript(raw: string): string {
+	const rawLines = raw.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+	if (rawLines.length === 0) return "";
+
+	const parsedLines: Array<Record<string, unknown> | null> = [];
+	let parsedCount = 0;
+	for (const line of rawLines) {
+		try {
+			const parsed = JSON.parse(line);
+			if (isRecord(parsed)) {
+				parsedLines.push(parsed);
+				parsedCount++;
+				continue;
+			}
+		} catch {
+			// Ignore parse errors; we only treat this as JSON if most lines parse.
+		}
+		parsedLines.push(null);
+	}
+
+	if (parsedCount < Math.ceil(rawLines.length * 0.6)) {
+		return "";
+	}
+
+	const conversationLines: string[] = [];
+	for (const record of parsedLines) {
+		if (!record) continue;
+		const normalized = normalizeJsonConversationRecord(record);
+		if (normalized) {
+			conversationLines.push(normalized);
+		}
+	}
+
+	return conversationLines.join("\n");
+}
+
+function normalizeJsonConversationRecord(record: Record<string, unknown>): string {
+	if (record.type === "item.completed") {
+		if (isRecord(record.item) && record.item.type === "agent_message") {
+			const itemRecord = record.item;
+			const text = extractString(itemRecord, ["text", "message", "content"]);
+			if (text) return `Assistant: ${text}`;
+		}
+	}
+
+	if (record.type === "event_msg") {
+		if (isRecord(record.payload) && record.payload.type === "user_message") {
+			const payloadRecord = record.payload;
+			const text = extractString(payloadRecord, ["message", "text", "content"]);
+			if (text) return `User: ${text}`;
+		}
+	}
+
+	const role = extractString(record, ["role", "speaker"]);
+	if (role) {
+		const lowerRole = role.toLowerCase();
+		if (lowerRole === "user") {
+			const text = extractString(record, ["content", "text", "message"]);
+			if (text) return `User: ${text}`;
+		}
+		if (lowerRole === "assistant") {
+			const text = extractString(record, ["content", "text", "message"]);
+			if (text) return `Assistant: ${text}`;
+		}
+	}
+
+	return "";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null;
+}
+
+function extractString(record: Record<string, unknown>, keys: readonly string[]): string {
+	for (const key of keys) {
+		const value = record[key];
+		if (typeof value === "string") {
+			const trimmed = value.trim();
+			if (trimmed.length > 0) return trimmed;
+		}
+	}
+	return "";
 }
 
 export function normalizeCodexTranscript(raw: string): string {
@@ -2208,17 +2301,7 @@ export function normalizeCodexTranscript(raw: string): string {
 
 		if (event.type === "response_item") {
 			const payload = event.payload;
-			if (typeof payload === "object" && payload !== null) {
-				const item = payload as Record<string, unknown>;
-				if (item.type === "function_call") {
-					const name = typeof item.name === "string" ? item.name : "tool";
-					const args = typeof item.arguments === "string" ? item.arguments : "";
-					lines.push(`Tool call (${name}): ${args}`);
-				}
-				if (item.type === "function_call_output" && typeof item.output === "string") {
-					lines.push(`Tool output: ${item.output.trim().slice(0, 1000)}`);
-				}
-			}
+			void payload;
 		}
 	}
 
