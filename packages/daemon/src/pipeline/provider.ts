@@ -178,9 +178,18 @@ const DEFAULT_OLLAMA_CONFIG = {
 
 function parseOptionalPositiveInt(raw: string | undefined): number | undefined {
 	if (typeof raw !== "string") return undefined;
-	const parsed = Number.parseInt(raw, 10);
-	if (!Number.isFinite(parsed) || parsed <= 0) return undefined;
-	return parsed;
+	const trimmed = raw.trim();
+	if (!/^[1-9]\d*$/.test(trimmed)) return undefined;
+	return normalizePositiveInt(Number(trimmed));
+}
+
+function normalizePositiveInt(value: number | undefined): number | undefined {
+	if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+		return undefined;
+	}
+	const normalized = Math.floor(value);
+	if (normalized <= 0 || !Number.isSafeInteger(normalized)) return undefined;
+	return normalized;
 }
 
 export function resolveDefaultOllamaFallbackModel(): string {
@@ -223,7 +232,7 @@ export function createOllamaProvider(
 		baseUrl: trimTrailingSlash(config?.baseUrl ?? DEFAULT_OLLAMA_CONFIG.baseUrl),
 		defaultTimeoutMs:
 			config?.defaultTimeoutMs ?? DEFAULT_OLLAMA_CONFIG.defaultTimeoutMs,
-		maxContextTokens: config?.maxContextTokens,
+		maxContextTokens: normalizePositiveInt(config?.maxContextTokens),
 		model,
 	};
 
@@ -239,7 +248,7 @@ export function createOllamaProvider(
 		try {
 			const options: Record<string, number> = {};
 			if (opts?.maxTokens) options.num_predict = opts.maxTokens;
-			if (typeof cfg.maxContextTokens === "number") {
+			if (cfg.maxContextTokens !== undefined) {
 				options.num_ctx = cfg.maxContextTokens;
 			}
 			const res = await fetch(`${cfg.baseUrl}/api/generate`, {
@@ -1260,9 +1269,8 @@ export function createOpenCodeProvider(
 			? rawFallbackModel.trim()
 			: resolveDefaultOllamaFallbackModel();
 	const ollamaFallbackMaxContextTokens =
-		typeof merged.ollamaFallbackMaxContextTokens === "number"
-			? merged.ollamaFallbackMaxContextTokens
-			: resolveDefaultOllamaFallbackMaxContextTokens(); // Eagerly resolved even when fallback is disabled; tryOllamaFallback gates on enableOllamaFallback.
+		normalizePositiveInt(merged.ollamaFallbackMaxContextTokens) ??
+		resolveDefaultOllamaFallbackMaxContextTokens(); // Eagerly resolved even when fallback is disabled; tryOllamaFallback gates on enableOllamaFallback.
 	const cfg = {
 		...merged,
 		baseUrl: trimTrailingSlash(merged.baseUrl),
@@ -1320,7 +1328,7 @@ export function createOpenCodeProvider(
 				const options: Record<string, number> = {
 					num_predict: fallbackOpts.maxTokens,
 				};
-				if (typeof cfg.ollamaFallbackMaxContextTokens === "number") {
+				if (cfg.ollamaFallbackMaxContextTokens !== undefined) {
 					options.num_ctx = cfg.ollamaFallbackMaxContextTokens;
 				}
 				const res = await fetch(`${cfg.ollamaFallbackBaseUrl}/api/generate`, {

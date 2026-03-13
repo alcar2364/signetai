@@ -43,6 +43,37 @@ function streamFromString(value: string): ReadableStream<Uint8Array> {
 	});
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseJsonObjectBody(body: BodyInit | null | undefined): Record<string, unknown> {
+	if (typeof body !== "string") {
+		throw new Error("Expected JSON body to be a string");
+	}
+	const parsed: unknown = JSON.parse(body);
+	if (!isRecord(parsed)) {
+		throw new Error("Expected JSON body to parse as an object");
+	}
+	return parsed;
+}
+
+function getObjectField(
+	record: Record<string, unknown>,
+	key: string,
+): Record<string, unknown> | undefined {
+	const value = record[key];
+	return isRecord(value) ? value : undefined;
+}
+
+function getNumberField(
+	record: Record<string, unknown>,
+	key: string,
+): number | undefined {
+	const value = record[key];
+	return typeof value === "number" ? value : undefined;
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -103,6 +134,14 @@ describe("createOllamaProvider", () => {
 
 	it("returns default max context when SIGNET_OLLAMA_FALLBACK_MAX_CTX is invalid", () => {
 		withEnvOverride("SIGNET_OLLAMA_FALLBACK_MAX_CTX", "abc", () => {
+			expect(resolveDefaultOllamaFallbackMaxContextTokens()).toBe(
+				DEFAULT_OLLAMA_FALLBACK_MAX_CONTEXT_TOKENS,
+			);
+		});
+	});
+
+	it("returns default max context when SIGNET_OLLAMA_FALLBACK_MAX_CTX has trailing text", () => {
+		withEnvOverride("SIGNET_OLLAMA_FALLBACK_MAX_CTX", "8192foo", () => {
 			expect(resolveDefaultOllamaFallbackMaxContextTokens()).toBe(
 				DEFAULT_OLLAMA_FALLBACK_MAX_CONTEXT_TOKENS,
 			);
@@ -179,19 +218,20 @@ describe("createOllamaProvider", () => {
 	it("generate() sends maxTokens as num_predict", async () => {
 		let capturedBody: Record<string, unknown> = {};
 		mockFetch(async (_url, init) => {
-			capturedBody = JSON.parse(init?.body as string);
+			capturedBody = parseJsonObjectBody(init?.body);
 			return Response.json({ response: "ok" });
 		});
 
 		const provider = createOllamaProvider({ model: "test-model" });
 		await provider.generate("test", { maxTokens: 100 });
-		expect((capturedBody.options as Record<string, unknown>)?.num_predict).toBe(100);
+		const options = getObjectField(capturedBody, "options");
+		expect(options ? getNumberField(options, "num_predict") : undefined).toBe(100);
 	});
 
 	it("generate() sends maxContextTokens as num_ctx", async () => {
 		let capturedBody: Record<string, unknown> = {};
 		mockFetch(async (_url, init) => {
-			capturedBody = JSON.parse(init?.body as string);
+			capturedBody = parseJsonObjectBody(init?.body);
 			return Response.json({ response: "ok" });
 		});
 
@@ -200,7 +240,23 @@ describe("createOllamaProvider", () => {
 			maxContextTokens: 4096,
 		});
 		await provider.generate("test");
-		expect((capturedBody.options as Record<string, unknown>)?.num_ctx).toBe(4096);
+		const options = getObjectField(capturedBody, "options");
+		expect(options ? getNumberField(options, "num_ctx") : undefined).toBe(4096);
+	});
+
+	it("generate() omits num_ctx when maxContextTokens is non-finite", async () => {
+		let capturedBody: Record<string, unknown> = {};
+		mockFetch(async (_url, init) => {
+			capturedBody = parseJsonObjectBody(init?.body);
+			return Response.json({ response: "ok" });
+		});
+
+		const provider = createOllamaProvider({
+			model: "test-model",
+			maxContextTokens: Number.NaN,
+		});
+		await provider.generate("test");
+		expect(getObjectField(capturedBody, "options")).toBeUndefined();
 	});
 
 	it("available() returns true when /api/tags responds 200", async () => {
@@ -627,7 +683,7 @@ describe("createOpenCodeProvider", () => {
 				return Response.json({ models: [] });
 			}
 			if (url === "http://172.17.0.1:11434/api/generate") {
-				fallbackBody = JSON.parse(init?.body as string) as Record<string, unknown>;
+				fallbackBody = parseJsonObjectBody(init?.body);
 				return Response.json({ response: '{"facts":[],"entities":[]}' });
 			}
 			return new Response("unexpected url", { status: 500 });
@@ -643,8 +699,11 @@ describe("createOpenCodeProvider", () => {
 		expect(result).toBe('{"facts":[],"entities":[]}');
 		expect(seenUrls).toContain("http://172.17.0.1:11434/api/tags");
 		expect(seenUrls).toContain("http://172.17.0.1:11434/api/generate");
+		const fallbackOptions = fallbackBody
+			? getObjectField(fallbackBody, "options")
+			: undefined;
 		expect(
-			((fallbackBody?.options as Record<string, unknown> | undefined)?.num_ctx),
+			fallbackOptions ? getNumberField(fallbackOptions, "num_ctx") : undefined,
 		).toBe(2048);
 	});
 });
