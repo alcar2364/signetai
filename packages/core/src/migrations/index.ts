@@ -525,21 +525,25 @@ export function hasPendingMigrations(db: MigrationDb): boolean {
 export const LATEST_SCHEMA_VERSION =
 	MIGRATIONS[MIGRATIONS.length - 1]?.version ?? 0;
 
-// Invariant: versions must be strictly increasing with no duplicates.
-// Catches registration mistakes (wrong order, copy-paste version number)
-// at module load time rather than silently at runtime.
-(function assertMigrationsSequence() {
+/**
+ * Assert that MIGRATIONS versions are strictly contiguous (each version
+ * equals the previous + 1). Called at the top of runMigrations rather
+ * than at module scope to comply with the effect-free module scope rule.
+ * Catches registration mistakes (wrong order, gaps, copy-paste version
+ * numbers) before any migration runs.
+ */
+function assertMigrationsSequence(): void {
 	for (let i = 1; i < MIGRATIONS.length; i++) {
 		const prev = MIGRATIONS[i - 1];
 		const curr = MIGRATIONS[i];
-		if (prev !== undefined && curr !== undefined && curr.version <= prev.version) {
+		if (prev !== undefined && curr !== undefined && curr.version !== prev.version + 1) {
 			throw new Error(
 				`MIGRATIONS invariant violated: version ${curr.version} (${curr.name}) ` +
-					`must be > ${prev.version} (${prev.name})`,
+					`must be exactly ${prev.version + 1} (prev: ${prev.name})`,
 			);
 		}
 	}
-})();
+}
 
 /**
  * Run all pending migrations against `db`.
@@ -551,6 +555,9 @@ export const LATEST_SCHEMA_VERSION =
  * only that migration.
  */
 export function runMigrations(db: MigrationDb): void {
+	// Guard against mis-registered migrations (wrong order, gaps, duplicates)
+	assertMigrationsSequence();
+
 	ensureMetaTables(db);
 
 	// Repair v0.1.65 CLI bug (stamps version without running migrations)
