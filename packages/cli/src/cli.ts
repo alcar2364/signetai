@@ -434,6 +434,10 @@ async function startDaemon(agentsDir: string = AGENTS_DIR): Promise<boolean> {
 		},
 	});
 
+	// Suppress unhandled 'error' events (e.g., bun not found) so the
+	// readiness poll below produces a clean failure instead of a crash.
+	proc.on("error", () => {});
+
 	proc.unref();
 	if (stderrFd !== null) closeSync(stderrFd);
 
@@ -445,9 +449,11 @@ async function startDaemon(agentsDir: string = AGENTS_DIR): Promise<boolean> {
 		}
 	}
 
-	// Daemon failed to start — show stderr output if available
+	// Daemon failed to start — show captured stderr if this run captured it.
+	// Only read startup.log when we wrote it; stale logs from a previous
+	// failed start would otherwise be printed misleadingly.
 	try {
-		if (existsSync(startupLogPath)) {
+		if (stderrFd !== null && existsSync(startupLogPath)) {
 			const stderr = readFileSync(startupLogPath, "utf-8").trim();
 			if (stderr) {
 				const lines = stderr.split("\n");

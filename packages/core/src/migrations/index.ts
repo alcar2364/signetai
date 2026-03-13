@@ -489,11 +489,16 @@ function verifyArtifacts(db: MigrationDb, migration: Migration): void {
 /**
  * Check whether there are unapplied migrations without running them.
  * Useful for backup-before-migrate logic in the daemon.
+ *
+ * This is intentionally read-only (beyond the bogus-version repair, which
+ * was present before this PR). repairPhantomMigrations is NOT called here
+ * because it deletes schema_migrations rows — doing so would corrupt the
+ * backup version label that the daemon reads immediately after this call.
+ * Phantom repair runs exclusively inside runMigrations.
  */
 export function hasPendingMigrations(db: MigrationDb): boolean {
 	ensureMetaTables(db);
 	repairBogusVersion(db);
-	repairPhantomMigrations(db);
 	const applied = appliedVersions(db);
 	return MIGRATIONS.some((m) => !applied.has(m.version));
 }

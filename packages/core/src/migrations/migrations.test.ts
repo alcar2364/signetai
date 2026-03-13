@@ -514,7 +514,7 @@ describe("migration framework", () => {
 		expect(migrations.length).toBe(MIGRATIONS.length);
 	});
 
-	test("post-DDL verification catches missing artifacts", () => {
+	test("post-DDL verification: all declared artifacts exist after migration", () => {
 		db = createFreshDb();
 
 		// We can't easily inject a broken migration into the real list,
