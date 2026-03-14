@@ -119,8 +119,8 @@
 			justify-self: center;
 			flex-wrap: wrap;
 			justify-content: center;
-			padding-left: 2rem;
-			padding-right: 2rem;
+			padding-left: 2.5rem;
+			padding-right: 2.5rem;
 		}
 
 		.banner-right {

@@ -241,17 +241,17 @@ $effect(() => {
 		onprefetchembeddings={prefetchEmbeddingsTab}
 	/>
 	<Sidebar.Trigger
-		class="mobile-sidebar-trigger fixed left-2 z-40 !h-[24px] !w-[62px] !p-0 !bg-transparent !border-none !shadow-none !rounded hover:!bg-[var(--sig-surface-raised)] hover:!shadow-[0_0_10px_var(--sig-highlight)] !transition-all !items-center !justify-start !pl-1.5 !flex"
-		style="top: calc(var(--titlebar-h, 0px) + 6px);"
+		class="mobile-sidebar-trigger fixed z-40 !size-5 !p-0 !bg-transparent !border-none !shadow-none !rounded-sm hover:!bg-[color-mix(in_srgb,var(--sig-surface-raised)_60%,transparent)] !transition-all !items-center !justify-center !flex"
+		style="top: calc(var(--titlebar-h, 0px) + var(--space-sm, 8px) + 3px); left: calc(var(--space-sm, 8px) + 1px);"
 		mobileOnly={true}
 	>
 		<span
-			class="inline-block h-3.5 w-3.5 shrink-0 relative
+			class="inline-block size-3.5 shrink-0 relative
 				before:absolute before:w-px before:h-full before:left-1/2
 				before:bg-[var(--sig-highlight)]
 				after:absolute after:w-full after:h-px after:top-1/2
 				after:bg-[var(--sig-highlight)]"
-			style="filter: drop-shadow(0 0 4px var(--sig-highlight));"
+			style="filter: drop-shadow(0 0 3px var(--sig-highlight));"
 			aria-hidden="true"
 		></span>
 	</Sidebar.Trigger>

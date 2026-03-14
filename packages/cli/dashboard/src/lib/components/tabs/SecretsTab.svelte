@@ -1287,7 +1287,7 @@ onMount(() => {
 
 	@media (max-width: 1023px) {
 		.tab-header {
-			padding-left: 2rem;
+			padding-left: 2.5rem;
 		}
 	}
 </style>
