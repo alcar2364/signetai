@@ -2,6 +2,32 @@
 
 All notable changes to Signet are documented here.
 
+## [0.58.0] - 2026-03-14
+
+### Bug Fixes
+
+- restore left border on mobile mix cards in 1-column layout
+- remove mix-grid padding gap, add unstyled trigger prop
+- merge duplicate .timeline-mix-grid selector into single block
+- move mix-grid bottom border to container for robustness
+- remove duplicate --mobile-header-inset from light theme block
+- address review — timeline margin token, light theme inset, sidebar var
+- extract mobile header padding into --mobile-header-inset token
+- shrink mobile trigger, increase header padding to prevent tap overlap
+- remove :has() layout-shift coupling, prevent WebKit overflow-x
+- scope mobile-only styles to prevent Tauri regressions
+- mobile mix-card double border, trigger reduced-motion guard
+- restore banner desktop spacing, add mix-grid bottom border
+- typed mobileOnly prop, symmetric banner padding, mobile mix-card layout
+- hide mobile trigger in Tauri desktop mode via isMobile guard
+- address remaining review regressions — trigger overlap, landscape, flex stretch
+- remove rounded-lg on zero-gap mix cards, add reduced-motion guard
+- address round-3 PR review feedback on timeline and trigger
+- address round-2 PR review feedback on mobile trigger and timeline
+- address PR review feedback on sheet width and timeline overflow
+- dashboard UI improvements — mobile sidebar, banner spacing, and QOS
+
+
 ## [0.57.1] - 2026-03-14
 
 ### Features
