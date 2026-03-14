@@ -7767,6 +7767,7 @@ function detectGitBranch(remote: string): string {
 			cwd: AGENTS_DIR,
 			encoding: "utf-8",
 			stdio: ["pipe", "pipe", "pipe"],
+			timeout: 3000,
 		}).trim();
 		// ref looks like "refs/remotes/origin/main" — extract the branch name
 		const prefix = `refs/remotes/${remote}/`;
@@ -7782,6 +7783,7 @@ function detectGitBranch(remote: string): string {
 			cwd: AGENTS_DIR,
 			encoding: "utf-8",
 			stdio: ["pipe", "pipe", "pipe"],
+			timeout: 3000,
 		}).trim();
 		if (branch && branch !== "HEAD") {
 			return branch;
