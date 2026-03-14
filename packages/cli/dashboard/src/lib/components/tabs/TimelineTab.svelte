@@ -865,7 +865,6 @@ onMount(() => {
 		gap: 0;
 		margin-left: calc(-1 * var(--panel-pad, 0.75rem));
 		margin-right: calc(-1 * var(--panel-pad, 0.75rem));
-		padding-bottom: 2rem;
 		border-bottom: 1px solid var(--sig-highlight-text);
 	}
 
@@ -1112,7 +1111,6 @@ onMount(() => {
 			margin-bottom: 0;
 			margin-left: 0;
 			margin-right: 0;
-			padding-bottom: 0;
 			grid-template-columns: minmax(0, 1fr);
 			gap: 0;
 		}
