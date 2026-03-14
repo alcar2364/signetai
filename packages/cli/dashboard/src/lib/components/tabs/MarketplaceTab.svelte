@@ -1384,7 +1384,7 @@ $effect(() => {
 		.tab-header {
 			flex-wrap: wrap;
 			gap: var(--space-sm);
-			padding-left: 2.5rem;
+			padding-left: var(--mobile-header-inset);
 		}
 
 		.module-head {

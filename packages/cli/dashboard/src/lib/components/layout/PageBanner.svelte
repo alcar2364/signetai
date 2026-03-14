@@ -119,8 +119,8 @@
 			justify-self: center;
 			flex-wrap: wrap;
 			justify-content: center;
-			padding-left: 2.5rem;
-			padding-right: 2.5rem;
+			padding-left: var(--mobile-header-inset);
+			padding-right: var(--mobile-header-inset);
 		}
 
 		.banner-right {
