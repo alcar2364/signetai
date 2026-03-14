@@ -1120,6 +1120,7 @@ onMount(() => {
 			overflow-y: auto;
 			border: 1px solid var(--sig-highlight-text);
 			border-top: none;
+			border-left: 1px solid var(--sig-highlight-text);
 			font-size: 10px;
 		}
 
