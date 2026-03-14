@@ -157,7 +157,10 @@ function setExtractionProvider(v: string | undefined): void {
 	const currentModel = st.aStr(["memory", "pipelineV2", "extractionModel"]);
 	customModelActive = false;
 	st.aSetStr(["memory", "pipelineV2", "extractionProvider"], nextProvider);
-	if (!nextProvider) return;
+	if (!nextProvider) {
+		st.aSetStr(["memory", "pipelineV2", "extractionModel"], "");
+		return;
+	}
 	if (!currentModel || isKnownPreset(currentModel)) {
 		st.aSetStr(["memory", "pipelineV2", "extractionModel"], defaultModelForProvider(nextProvider));
 	}

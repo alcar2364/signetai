@@ -247,9 +247,9 @@ export function initModelRegistry(
 		epoch: registryEpoch,
 	};
 
-	// Seed with known models
+	// Seed with known models, applying deprecation marks
 	for (const [provider, models] of Object.entries(KNOWN_MODELS)) {
-		state.models.set(provider, [...models]);
+		state.models.set(provider, markDeprecatedVersions(models));
 	}
 
 	// Run initial discovery
