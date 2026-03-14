@@ -221,8 +221,63 @@ class SettingsStore {
 		const v = this.get(this.agent, ...path);
 		return typeof v === "number" ? v : v ? Number(v) : "";
 	}
+	private toBool(val: YamlValue): boolean | null {
+		if (typeof val === "boolean") return val;
+		if (typeof val === "string") {
+			const s = val.trim().toLowerCase();
+			if (s === "true") return true;
+			if (s === "false") return false;
+		}
+		if (val === 1) return true;
+		if (val === 0) return false;
+		return null;
+	}
+
 	aBool(path: string[]) {
-		return Boolean(this.get(this.agent, ...path));
+		const parsed = this.toBool(this.get(this.agent, ...path));
+		if (parsed !== null) return parsed;
+		return this.pipelineDefault(path) ?? false;
+	}
+
+	private pipelineDefault(path: string[]): boolean | null {
+		// Pipeline defaults — must match DEFAULT_PIPELINE_V2 in memory-config.ts
+		const PIPELINE: Record<string, boolean> = {
+			enabled: true,
+			shadowMode: false,
+			mutationsFrozen: false,
+			allowUpdateDelete: true,
+			graphEnabled: true,
+			autonomousEnabled: true,
+			autonomousFrozen: false,
+			semanticContradictionEnabled: true,
+			rerankerEnabled: true,
+		};
+		const PREDICTOR: Record<string, boolean> = { enabled: true };
+		const PREDICTOR_PIPELINE: Record<string, boolean> = {
+			agentFeedback: true,
+			trainingTelemetry: false,
+		};
+		const SEARCH: Record<string, boolean> = { rehearsal_enabled: true };
+
+		if (path[0] === "memory" && path[1] === "pipelineV2") {
+			if (path.length === 3) {
+				const key = path[2];
+				if (key in PIPELINE) return PIPELINE[key];
+			}
+			if (path.length === 4 && path[2] === "predictor") {
+				const key = path[3];
+				if (key in PREDICTOR) return PREDICTOR[key];
+			}
+			if (path.length === 4 && path[2] === "predictorPipeline") {
+				const key = path[3];
+				if (key in PREDICTOR_PIPELINE) return PREDICTOR_PIPELINE[key];
+			}
+		}
+		if (path[0] === "search") {
+			const key = path[path.length - 1];
+			if (key in SEARCH) return SEARCH[key];
+		}
+		return null;
 	}
 	aSetStr(path: string[], val: string) {
 		this.set(this.agent, path, val);
@@ -243,7 +298,9 @@ class SettingsStore {
 		return typeof v === "number" ? v : v ? Number(v) : "";
 	}
 	sBool(path: string[]) {
-		return Boolean(this.get(this.sObj(), ...path));
+		const parsed = this.toBool(this.get(this.sObj(), ...path));
+		if (parsed !== null) return parsed;
+		return this.pipelineDefault(path) ?? false;
 	}
 	sSetStr(path: string[], val: string) {
 		this.set(this.sObj(), path, val);

@@ -1856,16 +1856,27 @@ async function existingSetupWizard(
 		if (options?.extractionProvider && options.extractionProvider !== "none") {
 			(config.memory as Record<string, unknown>).pipelineV2 = {
 				enabled: true,
-				extractionProvider: options.extractionProvider,
-				extractionModel:
-					options.extractionModel ||
-					(options.extractionProvider === "claude-code"
-						? "haiku"
-						: options.extractionProvider === "codex"
-							? "gpt-5.3-codex"
-						: options.extractionProvider === "opencode"
-							? "anthropic/claude-haiku-4-5-20251001"
-							: "glm-4.7-flash"),
+				extraction: {
+					provider: options.extractionProvider,
+					model:
+						options.extractionModel ||
+						(options.extractionProvider === "claude-code"
+							? "haiku"
+							: options.extractionProvider === "codex"
+								? "gpt-5.3-codex"
+							: options.extractionProvider === "opencode"
+								? "anthropic/claude-haiku-4-5-20251001"
+								: "glm-4.7-flash"),
+				},
+				semanticContradictionEnabled: true,
+				graph: { enabled: true },
+				reranker: { enabled: true },
+				autonomous: {
+					enabled: true,
+					allowUpdateDelete: true,
+				},
+				predictor: { enabled: true },
+				predictorPipeline: { agentFeedback: true, trainingTelemetry: false },
 			};
 		}
 
@@ -2838,6 +2849,7 @@ ${agentName} is a helpful assistant.
 					provider: extractionProvider,
 					model: extractionModel,
 				},
+				semanticContradictionEnabled: true,
 				graph: { enabled: true },
 				reranker: { enabled: true },
 				autonomous: {
@@ -2845,6 +2857,8 @@ ${agentName} is a helpful assistant.
 					allowUpdateDelete: true,
 					maintenanceMode: "execute",
 				},
+				predictor: { enabled: true },
+				predictorPipeline: { agentFeedback: true, trainingTelemetry: false },
 			};
 		}
 
