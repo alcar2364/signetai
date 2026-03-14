@@ -51,7 +51,7 @@ function flipTelemetryOff(text: string): string {
 }
 
 export function migrateConfig(agentsDir: string): void {
-	const candidates = ["agent.yaml", "AGENT.yaml"];
+	const candidates = ["agent.yaml", "AGENT.yaml", "config.yaml"];
 	let path: string | undefined;
 	for (const name of candidates) {
 		const p = join(agentsDir, name);
@@ -73,7 +73,6 @@ export function migrateConfig(agentsDir: string): void {
 	const vMatch = /^configVersion:\s*(\d+)/m.exec(text);
 	if (vMatch && Number(vMatch[1]) >= 2) return;
 
-	const original = text;
 	const mutations: string[] = [];
 
 	for (const key of FLIP_TRUE) {
@@ -94,12 +93,14 @@ export function migrateConfig(agentsDir: string): void {
 		if (text !== before) mutations.push("trainingTelemetry: true → false");
 	}
 
-	// Stamp version — insert after `---` if present to keep valid YAML
-	if (text.startsWith("---\n") || text.startsWith("--- ")) {
+	// Stamp version — insert after `---` if present to keep valid YAML.
+	// Handle both LF and CRLF files.
+	const eol = text.includes("\r\n") ? "\r\n" : "\n";
+	if (/^---(?:\r?\n|[ \t])/.test(text)) {
 		const nl = text.indexOf("\n");
-		text = `${text.slice(0, nl + 1)}configVersion: 2\n${text.slice(nl + 1)}`;
+		text = `${text.slice(0, nl + 1)}configVersion: 2${eol}${text.slice(nl + 1)}`;
 	} else {
-		text = `configVersion: 2\n${text}`;
+		text = `configVersion: 2${eol}${text}`;
 	}
 	writeFileSync(path, text, "utf-8");
 
