@@ -2,8 +2,14 @@
  * One-time config migration for existing agent.yaml files.
  * Flips pipeline subsystem defaults to ON (except trainingTelemetry → OFF).
  * Guarded by `configVersion: 2` to prevent re-running.
+ *
+ * Regex-based — matches key names anywhere in the file. The target names
+ * (semanticContradictionEnabled, graphEnabled, agentFeedback, etc.) are
+ * specific enough that false positives in unrelated YAML sections are
+ * effectively impossible. Migration is restricted to agent.yaml/AGENT.yaml
+ * (not config.yaml) to limit blast radius.
  */
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { logger } from "./logger";
 
@@ -21,9 +27,6 @@ const FLIP_TRUE = [
 // Nested `enabled: false` under these parent keys → flip to true
 const NESTED_PARENTS = ["graph", "reranker", "autonomous", "predictor"] as const;
 
-// Note: regex-based — theoretically could match inside a YAML block scalar,
-// but the target key names (semanticContradictionEnabled, etc.) are specific
-// enough that false positives in description text are effectively impossible.
 function flip(text: string, key: string): string {
 	return text.replace(
 		new RegExp(`^(\\s*${key}:\\s*)false(\\s*(?:#.*)?)$`, "m"),
@@ -33,10 +36,11 @@ function flip(text: string, key: string): string {
 
 // Require 2+ leading spaces so we only match inside a nested block (pipelineV2),
 // not a top-level key that happens to share the same name.
+// Use \r?\n to handle both LF and CRLF files.
 function flipNested(text: string, parent: string): string {
 	return text.replace(
 		new RegExp(
-			`(^[ ]{2,}${parent}:\\s*\\n(?:\\s+\\w+:.*\\n)*?\\s+enabled:\\s*)false`,
+			`(^[ ]{2,}${parent}:\\s*(?:\\r?\\n)(?:\\s+\\w+:.*(?:\\r?\\n))*?\\s+enabled:\\s*)false`,
 			"m",
 		),
 		"$1true",
@@ -51,7 +55,9 @@ function flipTelemetryOff(text: string): string {
 }
 
 export function migrateConfig(agentsDir: string): void {
-	const candidates = ["agent.yaml", "AGENT.yaml", "config.yaml"];
+	// Only migrate agent.yaml/AGENT.yaml — config.yaml can contain arbitrary
+	// user sections where regex-based key matching would be unsafe.
+	const candidates = ["agent.yaml", "AGENT.yaml"];
 	let path: string | undefined;
 	for (const name of candidates) {
 		const p = join(agentsDir, name);
@@ -102,10 +108,14 @@ export function migrateConfig(agentsDir: string): void {
 	} else {
 		text = `configVersion: 2${eol}${text}`;
 	}
-	writeFileSync(path, text, "utf-8");
+
+	// Atomic write: temp file + rename to avoid partial writes on crash
+	const tmp = `${path}.migration.tmp`;
+	writeFileSync(tmp, text, "utf-8");
+	renameSync(tmp, path);
 
 	if (mutations.length > 0) {
-		logger.info("config-migration", "Migrated agent.yaml defaults", {
+		logger.info("config-migration", "Migrated config defaults", {
 			mutations,
 			file: path,
 		});
