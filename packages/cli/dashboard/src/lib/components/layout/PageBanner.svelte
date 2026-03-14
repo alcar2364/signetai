@@ -38,7 +38,7 @@
 		padding: 6px var(--space-md);
 		overflow: hidden;
 		background: transparent;
-		margin-bottom: 0;
+		margin-bottom: var(--space-sm);
 	}
 
 	/* Content layout — grid keeps side slots in flow to prevent overlap */
