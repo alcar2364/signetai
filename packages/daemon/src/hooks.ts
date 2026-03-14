@@ -2061,7 +2061,7 @@ export function handleSessionEnd(req: SessionEndRequest): SessionEndResponse {
 	if (req.transcriptPath && existsSync(req.transcriptPath)) {
 		try {
 			const rawTranscript = readFileSync(req.transcriptPath, "utf-8");
-			transcript = req.harness === "codex" ? normalizeCodexTranscript(rawTranscript) : rawTranscript;
+			transcript = normalizeSessionTranscript(req.harness, rawTranscript);
 		} catch {
 			logger.warn("hooks", "Could not read transcript", {
 				path: req.transcriptPath,
@@ -2111,16 +2111,26 @@ export function handleSessionEnd(req: SessionEndRequest): SessionEndResponse {
 		return { memoriesSaved: 0 };
 	}
 
-	// Truncate long transcripts for the LLM
-	const maxChars = 12000;
-	const truncated = transcript.length > maxChars ? `${transcript.slice(0, maxChars)}\n[truncated]` : transcript;
+	// Safety cap against degenerate inputs (corrupt files, etc).
+	// The summary worker handles long transcripts via chunked
+	// map-reduce summarization, so this is a last-resort guard.
+	const MAX_TRANSCRIPT_CHARS = 100_000;
+	let truncated = false;
+	if (transcript.length > MAX_TRANSCRIPT_CHARS) {
+		logger.warn("hooks", "Transcript exceeds safety cap, truncating", {
+			original: transcript.length,
+			cap: MAX_TRANSCRIPT_CHARS,
+		});
+		transcript = `${transcript.slice(0, MAX_TRANSCRIPT_CHARS)}\n[truncated]`;
+		truncated = true;
+	}
 
 	// Queue for async processing by the summary worker instead of
 	// blocking on LLM inference. The worker produces both a dated
 	// markdown summary and atomic fact rows.
 	const jobId = enqueueSummaryJob(getDbAccessor(), {
 		harness: req.harness,
-		transcript: truncated,
+		transcript,
 		sessionKey,
 		project: req.cwd,
 	});
@@ -2139,11 +2149,118 @@ export function handleSessionEnd(req: SessionEndRequest): SessionEndResponse {
 		sessionKey,
 		transcriptPath: req.transcriptPath,
 		transcriptChars: transcript.length,
-		queuedChars: truncated.length,
-		transcript: truncated,
+		truncated,
+		preview: transcript.slice(0, 500),
 	});
 
 	return { memoriesSaved: 0, queued: true, jobId };
+}
+
+export function normalizeSessionTranscript(harness: string, raw: string): string {
+	if (harness.trim().toLowerCase() === "codex") {
+		return normalizeCodexTranscript(raw);
+	}
+
+	const result = normalizeJsonConversationTranscript(raw);
+	// null = not a JSON-line transcript, safe to return raw
+	if (result === null) return raw;
+	// Empty string from a non-trivial transcript means all lines were
+	// non-conversational — warn so operators can add support for this schema
+	if (result === "" && raw.length > 500) {
+		logger.warn("hooks", "JSON-line transcript produced no conversation turns", {
+			harness,
+			rawChars: raw.length,
+		});
+	}
+	return result;
+}
+
+// Returns null when input is not JSON-line format (below 60% threshold).
+// Returns string (possibly empty) when input IS JSON-line — empty means
+// all lines were non-conversational (tool calls, metadata, etc.).
+export function normalizeJsonConversationTranscript(raw: string): string | null {
+	const rawLines = raw.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+	if (rawLines.length === 0) return "";
+
+	const parsedLines: Array<Record<string, unknown> | null> = [];
+	let parsedCount = 0;
+	for (const line of rawLines) {
+		try {
+			const parsed = JSON.parse(line);
+			if (isRecord(parsed)) {
+				parsedLines.push(parsed);
+				parsedCount++;
+				continue;
+			}
+		} catch {
+			// Ignore parse errors; we only treat this as JSON if most lines parse.
+		}
+		parsedLines.push(null);
+	}
+
+	// Not a JSON-line transcript — caller should fall back to raw
+	if (parsedCount < Math.ceil(rawLines.length * 0.6)) {
+		return null;
+	}
+
+	const conversationLines: string[] = [];
+	for (const record of parsedLines) {
+		if (!record) continue;
+		const normalized = normalizeJsonConversationRecord(record);
+		if (normalized) {
+			conversationLines.push(normalized);
+		}
+	}
+
+	return conversationLines.join("\n");
+}
+
+function normalizeJsonConversationRecord(record: Record<string, unknown>): string {
+	if (record.type === "item.completed") {
+		if (isRecord(record.item) && record.item.type === "agent_message") {
+			const itemRecord = record.item;
+			const text = extractString(itemRecord, ["text", "message", "content"]);
+			if (text) return `Assistant: ${text}`;
+		}
+	}
+
+	if (record.type === "event_msg") {
+		if (isRecord(record.payload) && record.payload.type === "user_message") {
+			const payloadRecord = record.payload;
+			const text = extractString(payloadRecord, ["message", "text", "content"]);
+			if (text) return `User: ${text}`;
+		}
+	}
+
+	const role = extractString(record, ["role", "speaker"]);
+	if (role) {
+		const lowerRole = role.toLowerCase();
+		if (lowerRole === "user") {
+			const text = extractString(record, ["content", "text", "message"]);
+			if (text) return `User: ${text}`;
+		}
+		if (lowerRole === "assistant") {
+			const text = extractString(record, ["content", "text", "message"]);
+			if (text) return `Assistant: ${text}`;
+		}
+	}
+
+	return "";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function extractString(record: Record<string, unknown>, keys: readonly string[]): string {
+	for (const key of keys) {
+		const value = record[key];
+		if (typeof value === "string") {
+			const trimmed = value.trim().replace(/[\r\n]+/g, " ");
+			if (trimmed.length > 0) return trimmed;
+		}
+	}
+	return "";
 }
 
 export function normalizeCodexTranscript(raw: string): string {
@@ -2164,20 +2281,8 @@ export function normalizeCodexTranscript(raw: string): string {
 		const event = parsed as Record<string, unknown>;
 
 		if (event.type === "session_meta") {
-			const payload = event.payload;
-			if (typeof payload === "object" && payload !== null) {
-				const meta = payload as Record<string, unknown>;
-				const cwd = typeof meta.cwd === "string" ? meta.cwd : "";
-				const model =
-					typeof meta.model === "string"
-						? meta.model
-						: typeof meta.model_provider === "string"
-							? meta.model_provider
-							: "";
-				if (cwd || model) {
-					lines.push(`Session: cwd=${cwd || "unknown"}, model=${model || "unknown"}`);
-				}
-			}
+			// Non-conversational metadata — omit to avoid leaking local
+			// paths (cwd) into downstream summaries
 			continue;
 		}
 
@@ -2189,7 +2294,7 @@ export function normalizeCodexTranscript(raw: string): string {
 				// item.completed which is authoritative and avoids duplicating
 				// content that Codex emits in both streaming and completion events.
 				if (msg.type === "user_message" && typeof msg.message === "string") {
-					lines.push(`User: ${msg.message.trim()}`);
+					lines.push(`User: ${msg.message.trim().replace(/[\r\n]+/g, " ")}`);
 				}
 			}
 			continue;
@@ -2200,26 +2305,13 @@ export function normalizeCodexTranscript(raw: string): string {
 			if (typeof item === "object" && item !== null) {
 				const record = item as Record<string, unknown>;
 				if (record.type === "agent_message" && typeof record.text === "string") {
-					lines.push(`Assistant: ${record.text.trim()}`);
+					lines.push(`Assistant: ${record.text.trim().replace(/[\r\n]+/g, " ")}`);
 				}
 			}
 			continue;
 		}
 
-		if (event.type === "response_item") {
-			const payload = event.payload;
-			if (typeof payload === "object" && payload !== null) {
-				const item = payload as Record<string, unknown>;
-				if (item.type === "function_call") {
-					const name = typeof item.name === "string" ? item.name : "tool";
-					const args = typeof item.arguments === "string" ? item.arguments : "";
-					lines.push(`Tool call (${name}): ${args}`);
-				}
-				if (item.type === "function_call_output" && typeof item.output === "string") {
-					lines.push(`Tool output: ${item.output.trim().slice(0, 1000)}`);
-				}
-			}
-		}
+		// response_item events (tool calls/outputs) are intentionally omitted
 	}
 
 	return lines.join("\n");
