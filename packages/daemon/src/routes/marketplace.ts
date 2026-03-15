@@ -535,6 +535,11 @@ function parseCatalogMarkdown(markdown: string, page: number): ParsedCatalogPage
 	return { total, entries };
 }
 
+/**
+ * Parse the modelcontextprotocol/servers README into catalog entries.
+ * Extracts both official reference servers (src/ links) and third-party
+ * servers (external GitHub links). Non-GitHub third-party URLs are skipped.
+ */
 export function parseReferenceServersMarkdown(markdown: string): MarketplaceMcpCatalogEntry[] {
 	const entries: MarketplaceMcpCatalogEntry[] = [];
 	// Shared across reference and third-party passes; IDs are namespaced
@@ -545,10 +550,10 @@ export function parseReferenceServersMarkdown(markdown: string): MarketplaceMcpC
 	const refStart = markdown.indexOf("## 🌟 Reference Servers");
 	if (refStart >= 0) {
 		const refAfter = markdown.slice(refStart);
-		const refEnd = Math.min(
-			...[refAfter.indexOf("### Archived"), refAfter.indexOf("## ", 1)].filter((i) => i > 0),
-		);
-		const refSection = refEnd < Infinity ? refAfter.slice(0, refEnd) : refAfter;
+		// Find earliest section boundary; empty filter → Math.min() → Infinity → use whole remainder
+		const boundaries = [refAfter.indexOf("### Archived"), refAfter.indexOf("## ", 1)].filter((i) => i > 0);
+		const refEnd = boundaries.length > 0 ? Math.min(...boundaries) : refAfter.length;
+		const refSection = refAfter.slice(0, refEnd);
 		const re = /^-\s+\*\*\[([^\]]+)\]\(src\/([^)]+)\)\*\*\s+-\s+(.+)$/gm;
 		let m: RegExpExecArray | null;
 		while ((m = re.exec(refSection)) !== null) {
@@ -820,6 +825,7 @@ async function fetchMcpServersOrgDetail(catalogId: string): Promise<DetailConfig
 	return extractStandardMcpConfig(markdown);
 }
 
+/** Fetch README from the modelcontextprotocol/servers repo for a reference server. */
 async function fetchReferenceServerDetail(catalogId: string): Promise<DetailConfig> {
 	const encodedPath = catalogId
 		.split("/")
@@ -839,8 +845,14 @@ async function fetchReferenceServerDetail(catalogId: string): Promise<DetailConf
 	return extractStandardMcpConfig(markdown);
 }
 
+const GITHUB_RAW_HOST = "https://raw.githubusercontent.com" as const;
+
+/**
+ * Fetch README.md from a GitHub repo to extract MCP server config.
+ * Security: only fetches from raw.githubusercontent.com with strict
+ * org/repo validation — no arbitrary URLs or redirects followed.
+ */
 async function fetchGithubServerDetail(catalogId: string): Promise<DetailConfig> {
-	// Validate strict org/repo format matching GitHub naming rules
 	if (!/^[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+$/.test(catalogId)) {
 		throw new Error("invalid github catalog id: expected org/repo");
 	}
@@ -850,12 +862,12 @@ async function fetchGithubServerDetail(catalogId: string): Promise<DetailConfig>
 		.join("/");
 	const headers = { "User-Agent": "signet-daemon-marketplace" };
 	const timeout = 25_000;
-	const url = `https://raw.githubusercontent.com/${encodedPath}/main/README.md`;
+	const url = `${GITHUB_RAW_HOST}/${encodedPath}/main/README.md`;
 	const res = await fetch(url, { headers, signal: AbortSignal.timeout(timeout) });
 
 	if (!res.ok) {
 		if (res.status === 404) {
-			const fallback = `https://raw.githubusercontent.com/${encodedPath}/master/README.md`;
+			const fallback = `${GITHUB_RAW_HOST}/${encodedPath}/master/README.md`;
 			const res2 = await fetch(fallback, { headers, signal: AbortSignal.timeout(timeout) });
 			if (res2.ok) return extractStandardMcpConfig(await res2.text());
 			throw new Error(`github detail fetch failed: main 404, master ${res2.status}`);
@@ -867,6 +879,7 @@ async function fetchGithubServerDetail(catalogId: string): Promise<DetailConfig>
 	return extractStandardMcpConfig(markdown);
 }
 
+/** Route detail fetch to the appropriate handler based on catalog source. */
 function fetchDetailBySource(source: MarketplaceMcpCatalogSource, catalogId: string): Promise<DetailConfig> {
 	if (source === "modelcontextprotocol/servers") return fetchReferenceServerDetail(catalogId);
 	if (source === "github") return fetchGithubServerDetail(catalogId);
