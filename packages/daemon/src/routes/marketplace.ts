@@ -537,6 +537,8 @@ function parseCatalogMarkdown(markdown: string, page: number): ParsedCatalogPage
 
 export function parseReferenceServersMarkdown(markdown: string): MarketplaceMcpCatalogEntry[] {
 	const entries: MarketplaceMcpCatalogEntry[] = [];
+	// Shared across reference and third-party passes; IDs are namespaced
+	// ("modelcontextprotocol/servers:slug" vs "github:org/repo") so no collisions.
 	const seen = new Set<string>();
 
 	// Parse reference servers (src/ links)
@@ -838,7 +840,8 @@ async function fetchReferenceServerDetail(catalogId: string): Promise<DetailConf
 }
 
 async function fetchGithubServerDetail(catalogId: string): Promise<DetailConfig> {
-	if (!/^[^/]+\/[^/]+$/.test(catalogId)) {
+	// Validate strict org/repo format matching GitHub naming rules
+	if (!/^[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+$/.test(catalogId)) {
 		throw new Error("invalid github catalog id: expected org/repo");
 	}
 	const encodedPath = catalogId

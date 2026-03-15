@@ -1366,6 +1366,7 @@ $effect(() => {
 		color: var(--sig-danger);
 	}
 
+	/* Fixed rail panels for tablet (768–1120px); sidebar is visible in this range */
 	@media (max-width: 1120px) {
 		.store-grid {
 			grid-template-columns: 1fr;

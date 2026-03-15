@@ -1,5 +1,6 @@
 <script lang="ts">
 import type { Skill, SkillSearchResult } from "$lib/api";
+import { getMonogram, getMonogramBg, getHueRotate } from "$lib/card-utils";
 import { Badge } from "$lib/components/ui/badge/index.js";
 import { Button } from "$lib/components/ui/button/index.js";
 import { sk } from "$lib/stores/skills.svelte";
@@ -49,35 +50,6 @@ function formatStat(n: number | undefined): string {
 	return String(n);
 }
 
-const MONOGRAM_COLORS = [
-	"var(--sig-icon-bg-1)",
-	"var(--sig-icon-bg-2)",
-	"var(--sig-icon-bg-3)",
-	"var(--sig-icon-bg-4)",
-	"var(--sig-icon-bg-5)",
-	"var(--sig-icon-bg-6)",
-];
-
-function getMonogramBg(name: string): string {
-	let hash = 0;
-	for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) & 0xffff;
-	return MONOGRAM_COLORS[Math.abs(hash) % MONOGRAM_COLORS.length] ?? MONOGRAM_COLORS[0];
-}
-
-function getHueRotate(name: string): number {
-	let hash = 0;
-	for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) & 0xffff;
-	return hash % 360;
-}
-
-function getMonogram(name: string): string {
-	// Split on hyphens, underscores, dots, spaces
-	const parts = name.split(/[-_.\s]+/).filter(Boolean);
-	if (parts.length >= 2) {
-		return (parts[0][0] + parts[1][0]).toUpperCase();
-	}
-	return name.slice(0, 2).toUpperCase();
-}
 
 let monogram = $derived(getMonogram(item.name));
 let monogramBg = $derived(getMonogramBg(item.name));

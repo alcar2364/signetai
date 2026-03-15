@@ -4,6 +4,7 @@ import {
 	type MarketplaceMcpCatalogEntry,
 	type MarketplaceMcpServer,
 } from "$lib/api";
+import { getMonogram, getMonogramBg, getHueRotate, getAvatarUrl, getAvatarFromSource } from "$lib/card-utils";
 import McpDetailSheet from "$lib/components/marketplace/McpDetailSheet.svelte";
 import McpInstallSheet from "$lib/components/marketplace/McpInstallSheet.svelte";
 import { Button } from "$lib/components/ui/button/index.js";
@@ -94,15 +95,6 @@ const displayMode = $derived<"installed" | "browse">(
 	view === "installed" && !mcpMarket.query.trim() ? "installed" : "browse",
 );
 
-const MONOGRAM_COLORS = [
-	"var(--sig-icon-bg-1)",
-	"var(--sig-icon-bg-2)",
-	"var(--sig-icon-bg-3)",
-	"var(--sig-icon-bg-4)",
-	"var(--sig-icon-bg-5)",
-	"var(--sig-icon-bg-6)",
-] as const;
-
 onMount(() => {
 	fetchMarketplaceMcpInstalled();
 	fetchMarketplaceMcpCatalog(5);
@@ -136,43 +128,6 @@ $effect(() => {
 
 function parseView(value: string): "browse" | "installed" {
 	return value === "installed" ? "installed" : "browse";
-}
-
-function getMonogram(name: string): string {
-	const parts = name.split(/[-_.\s]+/).filter(Boolean);
-	if (parts.length >= 2) {
-		return `${parts[0]?.[0] ?? ""}${parts[1]?.[0] ?? ""}`.toUpperCase();
-	}
-	return name.slice(0, 2).toUpperCase();
-}
-
-function getMonogramBg(name: string): string {
-	let hash = 0;
-	for (const ch of name) {
-		hash = (hash * 31 + ch.charCodeAt(0)) & 0xffff;
-	}
-	return MONOGRAM_COLORS[Math.abs(hash) % MONOGRAM_COLORS.length] ?? MONOGRAM_COLORS[0];
-}
-
-function getAvatarUrl(sourceUrl: string | undefined): string | null {
-	if (!sourceUrl) return null;
-	const match = sourceUrl.match(/github\.com\/([^/]+)/);
-	if (match?.[1]) return `https://github.com/${match[1]}.png?size=40`;
-	return null;
-}
-
-function getAvatarFromSource(source: string | undefined, catalogId: string | undefined): string | null {
-	if (!source) return null;
-	if (source.includes("/")) return `https://github.com/${source.split("/")[0]}.png?size=40`;
-	// "github" source — catalogId is "org/repo"
-	if (source === "github" && catalogId?.includes("/")) return `https://github.com/${catalogId.split("/")[0]}.png?size=40`;
-	return null;
-}
-
-function getHueRotate(name: string): number {
-	let hash = 0;
-	for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) & 0xffff;
-	return hash % 360;
 }
 
 const installedAvatarErrors = new SvelteSet<string>();
