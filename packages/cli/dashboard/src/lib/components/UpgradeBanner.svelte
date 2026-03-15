@@ -29,8 +29,16 @@
 		dismissed = localStorage.getItem(key) === "true";
 	});
 
+	function stripTags(html: string): string {
+		if (!browser) return html.replace(/<[^>]*>/g, "");
+		const el = document.createElement("div");
+		el.innerHTML = html;
+		return el.textContent ?? "";
+	}
+
 	// Fetch changelog and extract up to 3 items for the current version
 	$effect(() => {
+		notes = [];
 		if (!version || version === "0.0.0") return;
 		const v = version;
 		fetchChangelog()
@@ -42,10 +50,14 @@
 				const items = slice.match(/<li[^>]*>([\s\S]*?)<\/li>/gi);
 				if (!items) return;
 				notes = items.slice(0, 3).map((li) =>
-					li.replace(/<[^>]+>/g, "").trim(),
+					stripTags(li).trim(),
 				);
 			})
-			.catch(() => {});
+			.catch((e) => {
+				if (import.meta.env.DEV) {
+					console.warn("UpgradeBanner: changelog fetch failed", e);
+				}
+			});
 	});
 
 	const visible = $derived(
