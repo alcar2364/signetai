@@ -830,6 +830,7 @@ $effect(() => {
 									<Select.Item value="all" label="All sources" class="section-select-item" />
 									<Select.Item value="mcpservers.org" label="MCP Registry" class="section-select-item" />
 									<Select.Item value="modelcontextprotocol/servers" label="MCP GitHub" class="section-select-item" />
+									<Select.Item value="github" label="GitHub" class="section-select-item" />
 								{/if}
 							</Select.Content>
 						</Select.Root>

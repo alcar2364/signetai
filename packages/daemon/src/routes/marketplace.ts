@@ -837,17 +837,24 @@ async function fetchReferenceServerDetail(catalogId: string): Promise<DetailConf
 }
 
 async function fetchGithubServerDetail(catalogId: string): Promise<DetailConfig> {
+	if (!/^[^/]+\/[^/]+$/.test(catalogId)) {
+		throw new Error("invalid github catalog id: expected org/repo");
+	}
 	const encodedPath = catalogId
 		.split("/")
 		.map((part) => encodeURIComponent(part))
 		.join("/");
+	const headers = { "User-Agent": "signet-daemon-marketplace" };
+	const timeout = 25_000;
 	const url = `https://raw.githubusercontent.com/${encodedPath}/main/README.md`;
-	const res = await fetch(url, {
-		headers: { "User-Agent": "signet-daemon-marketplace" },
-		signal: AbortSignal.timeout(25_000),
-	});
+	const res = await fetch(url, { headers, signal: AbortSignal.timeout(timeout) });
 
 	if (!res.ok) {
+		if (res.status === 404) {
+			const fallback = `https://raw.githubusercontent.com/${encodedPath}/master/README.md`;
+			const res2 = await fetch(fallback, { headers, signal: AbortSignal.timeout(timeout) });
+			if (res2.ok) return extractStandardMcpConfig(await res2.text());
+		}
 		throw new Error(`github detail fetch failed: ${res.status}`);
 	}
 
