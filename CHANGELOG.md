@@ -2,6 +2,35 @@
 
 All notable changes to Signet are documented here.
 
+## [0.58.1] - 2026-03-15
+
+### Bug Fixes
+
+- address review — clear stale notes, dev-mode catch log, DOMParser strip
+- address review — early return on missing version, catch, stale guard
+- upgrade banner persistence, changelog link, and mobile trigger overlap
+- apply readCapped to catalog and reference fetchers
+- cap README response size, fix third-party popularityRank
+- lift catalog Map to store, anchor avatar URL regex
+- refEnd boundary, SSRF hardening, documentation coverage
+- mobile rail layout, O(n) catalog scan, explicit avatar source match
+- tighten URL regex, strip markdown images, clear avatar errors
+- use SvelteSet for reactive avatar error tracking, improve error msg
+- add missing 'GitHub' label in secondary sort dropdown
+- skip non-GitHub third-party entries, reset avatarFailed on URL change
+- address review — github source filter, branch fallback, catalogId validation
+- complete "github" source support for third-party MCP servers
+- add "github" to MarketplaceMcpCatalogSource type system
+- address round-2 review — third-party source, sidebar offset, avatar cleanup
+- address PR review — ID collisions, section bounds, avatar namespaces
+- marketplace UI refresh — card consistency, MCP catalog, GitHub avatars
+- **dashboard**: restore sidebar closing speed after breakpoint regression
+
+### Refactoring
+
+- extract shared card utils, tighten github validation, add docs
+
+
 ## [0.58.0] - 2026-03-14
 
 ### Bug Fixes
