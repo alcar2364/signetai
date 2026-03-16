@@ -56,17 +56,20 @@ const VALID_DEP_TYPES = new Set<string>(DEPENDENCY_TYPES);
 // Queries
 // ---------------------------------------------------------------------------
 
+const AGENT_ID = "default";
+
 function findStaleEntities(db: ReadDb, limit: number): readonly StaleEntity[] {
 	return db
 		.prepare(
 			`SELECT id, name, entity_type
 			 FROM entities
-			 WHERE last_synthesized_at IS NULL
-			    OR last_synthesized_at < updated_at
+			 WHERE agent_id = ?
+			   AND (last_synthesized_at IS NULL
+			        OR last_synthesized_at < updated_at)
 			 ORDER BY updated_at DESC
 			 LIMIT ?`,
 		)
-		.all(limit) as StaleEntity[];
+		.all(AGENT_ID, limit) as StaleEntity[];
 }
 
 function loadFacts(db: ReadDb, entityId: string, limit: number): readonly string[] {
@@ -75,11 +78,12 @@ function loadFacts(db: ReadDb, entityId: string, limit: number): readonly string
 			`SELECT ea.content
 			 FROM entity_attributes ea
 			 JOIN entity_aspects asp ON asp.id = ea.aspect_id
-			 WHERE asp.entity_id = ? AND ea.status = 'active'
+			 WHERE asp.entity_id = ? AND ea.agent_id = ?
+			   AND ea.status = 'active'
 			 ORDER BY ea.updated_at DESC
 			 LIMIT ?`,
 		)
-		.all(entityId, limit) as Array<{ content: string }>;
+		.all(entityId, AGENT_ID, limit) as Array<{ content: string }>;
 	return rows.map((r) => r.content);
 }
 
@@ -88,11 +92,11 @@ function loadTopEntities(db: ReadDb, excludeId: string, limit: number): readonly
 		.prepare(
 			`SELECT id, name, entity_type, mentions
 			 FROM entities
-			 WHERE id != ? AND mentions > 0
+			 WHERE id != ? AND agent_id = ? AND mentions > 0
 			 ORDER BY mentions DESC
 			 LIMIT ?`,
 		)
-		.all(excludeId, limit) as GraphEntity[];
+		.all(excludeId, AGENT_ID, limit) as GraphEntity[];
 }
 
 function loadExistingTargets(db: ReadDb, entityId: string): ReadonlySet<string> {
@@ -101,9 +105,9 @@ function loadExistingTargets(db: ReadDb, entityId: string): ReadonlySet<string> 
 			`SELECT LOWER(TRIM(dst.name)) AS target_name
 			 FROM entity_dependencies dep
 			 JOIN entities dst ON dst.id = dep.target_entity_id
-			 WHERE dep.source_entity_id = ?`,
+			 WHERE dep.source_entity_id = ? AND dep.agent_id = ?`,
 		)
-		.all(entityId) as Array<{ target_name: string }>;
+		.all(entityId, AGENT_ID) as Array<{ target_name: string }>;
 	return new Set(rows.map((r) => r.target_name));
 }
 
@@ -190,7 +194,9 @@ function validateResults(parsed: unknown): readonly SynthesisResult[] {
 async function tick(deps: DependencySynthesisDeps): Promise<void> {
 	const cfg = deps.pipelineCfg.structural;
 
-	const stale = deps.accessor.withReadDb((db) => findStaleEntities(db, 3));
+	const stale = deps.accessor.withReadDb((db) =>
+		findStaleEntities(db, cfg.dependencyBatchSize),
+	);
 	if (stale.length === 0) return;
 
 	for (const entity of stale) {
@@ -248,7 +254,7 @@ async function tick(deps: DependencySynthesisDeps): Promise<void> {
 				upsertDependency(deps.accessor, {
 					sourceEntityId: entity.id,
 					targetEntityId: target.id,
-					agentId: "default",
+					agentId: AGENT_ID,
 					dependencyType: result.dep_type as DependencyType,
 					strength: 0.5,
 					reason: result.reason || null,
