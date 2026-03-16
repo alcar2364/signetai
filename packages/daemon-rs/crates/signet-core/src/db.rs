@@ -57,6 +57,8 @@ pub struct DbPool {
     high_tx: mpsc::Sender<WriteRequest>,
     low_tx: mpsc::Sender<WriteRequest>,
     read_pool: Pool<SqliteConnectionManager>,
+    /// Wakes the writer thread whenever work is enqueued on either lane.
+    notify_tx: std::sync::mpsc::SyncSender<()>,
 }
 
 impl DbPool {
@@ -100,15 +102,19 @@ impl DbPool {
         let (high_tx, high_rx) = mpsc::channel::<WriteRequest>(HIGH_PRIORITY_CAPACITY);
         let (low_tx, low_rx) = mpsc::channel::<WriteRequest>(LOW_PRIORITY_CAPACITY);
 
+        // Notification channel: capacity 1 — a pending token is enough to wake the writer.
+        let (notify_tx, notify_rx) = std::sync::mpsc::sync_channel::<()>(1);
+
         // Spawn writer task
         let handle = tokio::task::spawn_blocking(move || {
-            writer_loop(write_conn, high_rx, low_rx);
+            writer_loop(write_conn, high_rx, low_rx, notify_rx);
         });
 
         let pool = Self {
             high_tx,
             low_tx,
             read_pool,
+            notify_tx,
         };
         Ok((pool, handle))
     }
@@ -131,6 +137,8 @@ impl DbPool {
         };
 
         send_result.map_err(|_| CoreError::ChannelClosed)?;
+        // Wake the writer thread regardless of which lane received work.
+        let _ = self.notify_tx.try_send(());
         reply_rx.await.map_err(|_| CoreError::ChannelClosed)?
     }
 
@@ -188,6 +196,7 @@ fn writer_loop(
     conn: Connection,
     mut high_rx: mpsc::Receiver<WriteRequest>,
     mut low_rx: mpsc::Receiver<WriteRequest>,
+    notify_rx: std::sync::mpsc::Receiver<()>,
 ) {
     loop {
         // Drain all high-priority first
@@ -209,11 +218,12 @@ fn writer_loop(
             Err(mpsc::error::TryRecvError::Disconnected) => return,
         }
 
-        // Nothing to do — block on either channel
-        // Use blocking recv on high, but also check low
-        match high_rx.blocking_recv() {
-            Some(req) => process_write(&conn, req),
-            None => return, // Channel closed, shutdown
+        // Both queues empty — block until either lane receives work.
+        // notify_rx is driven by DbPool::write() regardless of priority.
+        // When the pool is dropped, notify_tx drops too and recv() returns Err.
+        match notify_rx.recv() {
+            Ok(()) => {} // re-check both queues
+            Err(_) => return,
         }
     }
 }

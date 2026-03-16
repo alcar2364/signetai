@@ -166,7 +166,9 @@ pub async fn recall(
                     let len = content.len();
                     let is_truncated = len > truncate;
                     let display = if is_truncated {
-                        format!("{} [truncated]", &content[..truncate])
+                        // floor_char_boundary avoids slicing mid-codepoint
+                        let boundary = content.floor_char_boundary(truncate);
+                        format!("{} [truncated]", &content[..boundary])
                     } else {
                         content
                     };
@@ -193,9 +195,6 @@ pub async fn recall(
                 .filter_map(|r| r.ok())
                 .collect();
 
-            // Update access tracking
-            touch_accessed(conn, &ids);
-
             let results: Vec<RecallHit> = scored
                 .iter()
                 .filter_map(|s| {
@@ -216,7 +215,23 @@ pub async fn recall(
         .await;
 
     match result {
-        Ok(resp) => (StatusCode::OK, Json(serde_json::to_value(resp).unwrap())).into_response(),
+        Ok(resp) => {
+            // Update access tracking on a writable connection (fire-and-forget).
+            if !resp.results.is_empty() {
+                let ids: Vec<String> = resp.results.iter().map(|h| h.id.clone()).collect();
+                let pool = state.pool.clone();
+                tokio::spawn(async move {
+                    let _ = pool
+                        .write(signet_core::db::Priority::Low, move |conn| {
+                            let refs: Vec<&str> = ids.iter().map(|s| s.as_str()).collect();
+                            touch_accessed(conn, &refs);
+                            Ok(serde_json::Value::Null)
+                        })
+                        .await;
+                });
+            }
+            (StatusCode::OK, Json(serde_json::to_value(resp).unwrap())).into_response()
+        }
         Err(e) => {
             warn!(err = %e, "recall failed");
             (
