@@ -146,7 +146,7 @@ function buildDependencyPrompt(
 Entity: ${entityName} (${entityType})
 Aspects: ${aspectList}
 
-Dependency types: uses, requires, owned_by, blocks, informs
+Dependency types: uses, requires, owned_by, blocks, informs, built, depends_on, related_to, learned_from, teaches, knows, assumes, contradicts, supersedes, part_of, precedes, follows, triggers, impacts, produces, consumes
 
 ${factList}
 
