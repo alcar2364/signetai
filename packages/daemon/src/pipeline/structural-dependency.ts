@@ -11,7 +11,7 @@ import type { DbAccessor, WriteDb, ReadDb } from "../db-accessor";
 import type { PipelineV2Config } from "../memory-config";
 import type { LlmProvider } from "./provider";
 import { stripFences, tryParseJson } from "./extraction";
-import { upsertDependency } from "../knowledge-graph";
+import { upsertAspect, upsertDependency } from "../knowledge-graph";
 import { logger } from "../logger";
 
 // ---------------------------------------------------------------------------
@@ -146,7 +146,7 @@ function buildDependencyPrompt(
 Entity: ${entityName} (${entityType})
 Aspects: ${aspectList}
 
-Dependency types: uses, requires, owned_by, blocks, informs, built, depends_on, related_to, learned_from, teaches, knows, assumes, contradicts, supersedes, part_of, precedes, follows, triggers, impacts, produces, consumes
+Dependency types: ${DEPENDENCY_TYPES.join(", ")}
 
 ${factList}
 
@@ -302,10 +302,16 @@ async function processDependencyBatch(
 			);
 
 			if (targetEntity) {
+				const aspect = upsertAspect(deps.accessor, {
+					entityId: payload.entity_id,
+					agentId: "default",
+					name: result.aspect,
+				});
 				upsertDependency(deps.accessor, {
 					sourceEntityId: payload.entity_id,
 					targetEntityId: targetEntity.id,
 					agentId: "default",
+					aspectId: aspect.id,
 					dependencyType: result.dep_type as DependencyType,
 					strength: 0.5,
 				});
