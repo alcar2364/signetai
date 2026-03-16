@@ -51,6 +51,7 @@ interface DependencyResult {
 	readonly kind: "attribute" | "constraint";
 	readonly dep_target: string | null;
 	readonly dep_type: string | null;
+	readonly reason: string | null;
 }
 
 const VALID_DEP_TYPES = new Set<string>(DEPENDENCY_TYPES);
@@ -178,7 +179,7 @@ ${DEPENDENCY_TYPES.map((t) => `- ${t}: ${DEP_DESCRIPTIONS[t]}`).join("\n")}
 
 ${factList}
 
-For each fact return: {"i": N, "aspect": "...", "kind": "attribute"|"constraint", "dep_target": "entity or null", "dep_type": "type or null"}
+For each fact return: {"i": N, "aspect": "...", "kind": "attribute"|"constraint", "dep_target": "entity or null", "dep_type": "type or null", "reason": "short explanation or null"}
 /no_think`;
 }
 
@@ -211,8 +212,11 @@ function validateDependencyResults(
 		const depType = typeof obj.dep_type === "string" && VALID_DEP_TYPES.has(obj.dep_type)
 			? obj.dep_type
 			: null;
+		const reason = typeof obj.reason === "string" && obj.reason.trim().length > 0
+			? obj.reason.trim().slice(0, 300)
+			: null;
 
-		valid.push({ i, aspect, kind, dep_target: depTarget, dep_type: depType });
+		valid.push({ i, aspect, kind, dep_target: depTarget, dep_type: depType, reason });
 	}
 
 	return valid;
@@ -356,6 +360,7 @@ async function processDependencyBatch(
 							aspectId: aspect.id,
 							dependencyType: result.dep_type as DependencyType,
 							strength: 0.5,
+							reason: result.reason,
 						});
 					});
 					depsCreated++;

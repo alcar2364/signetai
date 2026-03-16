@@ -333,6 +333,10 @@ export interface PipelineStructuralConfig {
 	readonly classifyBatchSize: number;
 	readonly dependencyBatchSize: number;
 	readonly pollIntervalMs: number;
+	readonly synthesisEnabled: boolean;
+	readonly synthesisIntervalMs: number;
+	readonly synthesisTopEntities: number;
+	readonly synthesisMaxFacts: number;
 }
 
 export interface PipelineFeedbackConfig {
@@ -641,6 +645,7 @@ export interface EntityDependency {
 	readonly aspectId: string | null;
 	readonly dependencyType: DependencyType;
 	readonly strength: number;
+	readonly reason: string | null;
 	readonly createdAt: string;
 	readonly updatedAt: string;
 }
