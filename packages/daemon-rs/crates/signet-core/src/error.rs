@@ -12,7 +12,7 @@ pub enum CoreError {
     Json(#[from] serde_json::Error),
 
     #[error("yaml error: {0}")]
-    Yaml(#[from] serde_yaml::Error),
+    Yaml(#[from] serde_yml::Error),
 
     #[error("migration error: {0}")]
     Migration(String),

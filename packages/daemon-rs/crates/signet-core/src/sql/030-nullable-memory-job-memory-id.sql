@@ -7,6 +7,12 @@
 --   SQLiteError: NOT NULL constraint failed: memory_jobs.memory_id
 --
 -- SQLite doesn't support ALTER COLUMN, so we rebuild the table.
+--
+-- NOTE: document_id appears in memory_jobs_new below because it was added by
+-- migration 007 and must be preserved in the rebuild. This is NOT a duplicate
+-- column definition — migration 007 used ALTER TABLE ADD COLUMN (via the Rust
+-- add_column_if_missing helper) while this migration replaces the whole table.
+-- The SELECT...FROM memory_jobs at the end copies all existing document_id data.
 
 CREATE TABLE IF NOT EXISTS memory_jobs_new (
     id TEXT PRIMARY KEY,

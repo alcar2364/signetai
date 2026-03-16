@@ -73,7 +73,7 @@ fn dirs_home() -> PathBuf {
 fn load_manifest(base: &Path) -> Option<AgentManifest> {
     let path = base.join("agent.yaml");
     let content = std::fs::read_to_string(&path).ok()?;
-    serde_yaml::from_str(&content).ok()
+    serde_yml::from_str(&content).ok()
 }
 
 // ---------------------------------------------------------------------------

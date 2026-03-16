@@ -1,6 +1,9 @@
 -- Benchmark dataset: 1000 memories, 50 entities, 10 sessions, 500 embeddings
 -- Used by bench-spec.md for reproducible performance testing.
 -- Apply to a fresh DB after migrations: sqlite3 bench.db < bench-dataset.sql
+-- NOTE: vec_embeddings population (for sqlite-vec) requires the sqlite-vec
+--       extension to be loaded at apply time. The embeddings metadata table
+--       is always populated; vec_embeddings must be seeded separately if needed.
 
 -- Insert 1000 memories with varied types
 WITH RECURSIVE cnt(x) AS (
@@ -43,13 +46,13 @@ FROM cnt;
 INSERT OR IGNORE INTO memories_fts (rowid, content)
 SELECT rowid, content FROM memories WHERE is_deleted = 0;
 
--- Insert 50 entities
+-- Insert 50 entities (schema columns: entity_type, mentions, agent_id)
 WITH RECURSIVE cnt(x) AS (
   SELECT 1
   UNION ALL
   SELECT x+1 FROM cnt WHERE x < 50
 )
-INSERT OR IGNORE INTO entities (id, name, canonical_name, type, first_seen, last_seen, mention_count, agent_id, created_at, updated_at)
+INSERT OR IGNORE INTO entities (id, name, canonical_name, entity_type, mentions, agent_id, created_at, updated_at)
 SELECT
   printf('ent-%04d', x),
   'Entity ' || x,
@@ -61,12 +64,11 @@ SELECT
     WHEN 3 THEN 'concept'
     WHEN 4 THEN 'organization'
   END,
-  datetime('2026-01-01'),
-  datetime('2026-01-15'),
   x * 3,
   'bench-agent',
   datetime('2026-01-01'),
-  datetime('2026-01-01');
+  datetime('2026-01-01')
+FROM cnt;
 
 -- Insert 10 sessions
 WITH RECURSIVE cnt(x) AS (
@@ -84,13 +86,13 @@ SELECT
   CASE (x % 2) WHEN 0 THEN 'plugin' ELSE 'legacy' END
 FROM cnt;
 
--- Insert 20 pipeline jobs
+-- Insert 20 pipeline jobs (table: memory_jobs, type column: job_type)
 WITH RECURSIVE cnt(x) AS (
   SELECT 1
   UNION ALL
   SELECT x+1 FROM cnt WHERE x < 20
 )
-INSERT OR IGNORE INTO pipeline_jobs (id, type, memory_id, status, priority, attempts, created_at, updated_at)
+INSERT OR IGNORE INTO memory_jobs (id, job_type, memory_id, status, attempts, created_at, updated_at)
 SELECT
   printf('job-%04d', x),
   CASE (x % 3)
@@ -105,8 +107,28 @@ SELECT
     WHEN 2 THEN 'completed'
     WHEN 3 THEN 'dead'
   END,
-  1,
   CASE WHEN x % 4 = 3 THEN 3 ELSE 0 END,
   datetime('2026-01-01', '+' || x || ' minutes'),
+  datetime('2026-01-01', '+' || x || ' minutes')
+FROM cnt;
+
+-- Insert 500 embedding metadata rows (embeddings table — always available).
+-- Vectors are zeroblob(3072) = 768 float32 dimensions, all zeros.
+-- For hybrid-search benchmarks that exercise sqlite-vec, also seed vec_embeddings
+-- after loading the extension: INSERT INTO vec_embeddings (id, embedding) SELECT ...
+WITH RECURSIVE cnt(x) AS (
+  SELECT 1
+  UNION ALL
+  SELECT x+1 FROM cnt WHERE x < 500
+)
+INSERT OR IGNORE INTO embeddings (id, content_hash, vector, dimensions, source_type, source_id, chunk_text, created_at)
+SELECT
+  printf('emb-%04d', x),
+  printf('hash%04d', x),
+  zeroblob(3072),
+  768,
+  'memory',
+  printf('mem-%04d', x),
+  'Memory content for benchmark test number ' || x || '.',
   datetime('2026-01-01', '+' || x || ' minutes')
 FROM cnt;

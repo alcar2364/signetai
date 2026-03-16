@@ -14,10 +14,17 @@ use crate::migrations;
 // ---------------------------------------------------------------------------
 
 pub fn register_vec_extension() {
+    // SAFETY: sqlite3_vec_init is the standard SQLite extension entry point for
+    // sqlite-vec. Its actual C signature is:
+    //   int sqlite3_vec_init(sqlite3*, char**, sqlite3_api_routines*)
+    // which is exactly what sqlite3_auto_extension expects. The sqlite_vec crate
+    // exposes it as `fn()` for simplicity; the transmute is sound because the
+    // ABI matches and sqlite3_auto_extension never calls the pointer with the
+    // wrong arguments.
     unsafe {
+        let func: unsafe extern "C" fn() = sqlite_vec::sqlite3_vec_init;
         #[allow(clippy::missing_transmute_annotations)]
-        let func = std::mem::transmute(sqlite_vec::sqlite3_vec_init as *const ());
-        rusqlite::ffi::sqlite3_auto_extension(Some(func));
+        rusqlite::ffi::sqlite3_auto_extension(Some(std::mem::transmute(func)));
     }
 }
 
@@ -191,6 +198,20 @@ impl DbPool {
 // ---------------------------------------------------------------------------
 // Writer event loop — drains high before low
 // ---------------------------------------------------------------------------
+//
+// Shutdown contract:
+//   DbPool is Clone; the writer loop runs until ALL clones are dropped, because
+//   both mpsc senders (high_tx, low_tx) and the notify_tx are embedded in DbPool
+//   and drop together. When all DbPool clones drop:
+//     - high_tx / low_tx drop → high_rx / low_rx report Disconnected on try_recv
+//     - notify_tx drops → notify_rx.recv() returns Err
+//   The loop checks Disconnected on both try_recv paths and Err on notify_rx.recv(),
+//   so it exits cleanly regardless of which signal fires first.
+//
+//   Pending requests at shutdown: callers hold a oneshot::Receiver for their reply.
+//   If the writer exits before sending a reply, the oneshot closes and callers get
+//   ChannelClosed. No silent data loss — all in-flight high-priority work is either
+//   completed or returns an error to the caller.
 
 fn writer_loop(
     conn: Connection,
