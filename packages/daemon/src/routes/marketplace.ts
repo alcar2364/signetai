@@ -495,13 +495,13 @@ function parseCatalogMarkdown(markdown: string, page: number): ParsedCatalogPage
 
 	const entries: MarketplaceMcpCatalogEntry[] = [];
 	const seen = new Set<string>();
-	const re = /\[([^\]]+)\]\((https:\/\/mcpservers\.org\/(?:[a-z]{2}\/)?servers\/[^)]+)\)/g;
+	const re = /\[([^\]]+)\]\((https:\/\/mcpservers\.org\/(?:[a-z][a-z-]{1,9}\/)?servers\/[^)]+)\)/g;
 	let m: RegExpExecArray | null;
 
 	while ((m = re.exec(markdown)) !== null) {
 		const rawText = m[1].replace(/\s+/g, " ").trim();
 		const url = m[2].trim();
-		const catalogId = url.replace(/^https:\/\/mcpservers\.org\/(?:[a-z]{2}\/)?servers\//, "");
+		const catalogId = url.replace(/^https:\/\/mcpservers\.org\/(?:[a-z][a-z-]{1,9}\/)?servers\//, "");
 		if (!catalogId || seen.has(catalogId)) continue;
 		seen.add(catalogId);
 
@@ -813,7 +813,8 @@ function writeInstalledServers(servers: readonly InstalledMarketplaceMcpServer[]
 }
 
 async function fetchMcpServersOrgDetail(catalogId: string): Promise<DetailConfig> {
-	const url = `https://r.jina.ai/http://mcpservers.org/servers/${catalogId}`;
+	// Use locale-prefixed path directly to avoid relying on redirect
+	const url = `https://r.jina.ai/http://mcpservers.org/en/servers/${catalogId}`;
 	const res = await fetch(url, {
 		headers: { "User-Agent": "signet-daemon-marketplace" },
 		signal: AbortSignal.timeout(25_000),
@@ -1337,7 +1338,7 @@ export function mountMarketplaceRoutes(app: Hono): void {
 				? `https://github.com/modelcontextprotocol/servers/tree/main/src/${catalogId}`
 				: selection.source === "github"
 					? `https://github.com/${catalogId}`
-					: `https://mcpservers.org/servers/${catalogId}`;
+					: `https://mcpservers.org/en/servers/${catalogId}`;
 
 		const server: InstalledMarketplaceMcpServer = {
 			id,
