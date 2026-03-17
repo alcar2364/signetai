@@ -103,12 +103,13 @@ function loadTopEntities(db: ReadDb, excludeId: string, limit: number): readonly
 function loadExistingTargets(db: ReadDb, entityId: string): ReadonlySet<string> {
 	const rows = db
 		.prepare(
-			`SELECT dst.canonical_name AS target_name
+			`SELECT dst.name AS target_name
 			 FROM entity_dependencies dep
 			 JOIN entities dst ON dst.id = dep.target_entity_id
+			   AND dst.agent_id = ?
 			 WHERE dep.source_entity_id = ? AND dep.agent_id = ?`,
 		)
-		.all(entityId, AGENT_ID) as Array<{ target_name: string }>;
+		.all(AGENT_ID, entityId, AGENT_ID) as Array<{ target_name: string }>;
 	return new Set(rows.map((r) => r.target_name));
 }
 
@@ -295,6 +296,7 @@ export function startDependencySynthesisWorker(
 ): DependencySynthesisHandle {
 	let running = true;
 	let ticking = false;
+	let tickDone: (() => void) | null = null;
 	let timer: ReturnType<typeof setInterval> | null = null;
 	const interval = deps.pipelineCfg.structural.synthesisIntervalMs;
 
@@ -307,7 +309,10 @@ export function startDependencySynthesisWorker(
 					error: String(e),
 				});
 			})
-			.finally(() => { ticking = false; });
+			.finally(() => {
+				ticking = false;
+				if (tickDone) tickDone();
+			});
 	}, interval);
 
 	logger.info("dependency-synthesis", "Worker started", {
@@ -320,6 +325,10 @@ export function startDependencySynthesisWorker(
 		async stop() {
 			running = false;
 			if (timer) clearInterval(timer);
+			// Drain in-flight tick before returning
+			if (ticking) {
+				await new Promise<void>((resolve) => { tickDone = resolve; });
+			}
 			logger.info("dependency-synthesis", "Worker stopped");
 		},
 		get running() {
