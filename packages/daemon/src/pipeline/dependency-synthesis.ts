@@ -116,8 +116,8 @@ function markSynthesized(accessor: DbAccessor, entityId: string): void {
 	const now = new Date().toISOString();
 	accessor.withWriteTx((db) => {
 		db.prepare(
-			"UPDATE entities SET last_synthesized_at = ? WHERE id = ?",
-		).run(now, entityId);
+			"UPDATE entities SET last_synthesized_at = ? WHERE id = ? AND agent_id = ?",
+		).run(now, entityId, AGENT_ID);
 	});
 }
 
@@ -271,7 +271,11 @@ async function tick(deps: DependencySynthesisDeps): Promise<void> {
 			}
 		}
 
-		markSynthesized(deps.accessor, entity.id);
+		// Only mark synthesized if there was nothing to do or at least one
+		// upsert succeeded — otherwise the entity retries on the next tick.
+		if (results.length === 0 || created > 0) {
+			markSynthesized(deps.accessor, entity.id);
+		}
 
 		logger.info("dependency-synthesis", "Entity synthesized", {
 			entity: entity.name,
