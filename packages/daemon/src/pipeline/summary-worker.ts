@@ -1033,7 +1033,7 @@ async function resolveProvider(cfg: ReturnType<typeof loadMemoryConfig>): Promis
 				});
 			}
 			return createOpenRouterProvider({
-				model: model || "openai/gpt-5.3-mini",
+				model: model || "openai/gpt-4o-mini",
 				apiKey,
 				baseUrl: endpoint ?? "https://openrouter.ai/api/v1",
 				referer: process.env.OPENROUTER_HTTP_REFERER,

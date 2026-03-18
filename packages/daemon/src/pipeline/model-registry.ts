@@ -17,6 +17,7 @@
 
 import type { ModelRegistryEntry, PipelineModelRegistryConfig } from "@signet/core";
 import { logger } from "../logger";
+import { trimTrailingSlash } from "./url";
 
 // ---------------------------------------------------------------------------
 // Known model catalogs (seed data, updated by discovery)
@@ -54,8 +55,10 @@ const KNOWN_MODELS: Record<string, ModelRegistryEntry[]> = {
 		{ id: "google/gemini-2.5-flash", provider: "opencode", label: "Gemini 2.5 Flash", tier: "low", deprecated: false },
 	],
 	openrouter: [
-		{ id: "openai/gpt-5.3-mini", provider: "openrouter", label: "GPT 5.3 Mini", tier: "low", deprecated: false },
-		{ id: "openai/gpt-5.3", provider: "openrouter", label: "GPT 5.3", tier: "high", deprecated: false },
+		// Keep these slugs valid for no-discovery fallback mode.
+		{ id: "openai/gpt-4o-mini", provider: "openrouter", label: "GPT-4o Mini", tier: "low", deprecated: false },
+		{ id: "openai/gpt-4o", provider: "openrouter", label: "GPT-4o", tier: "mid", deprecated: false },
+		{ id: "anthropic/claude-haiku-4-5-20251001", provider: "openrouter", label: "Claude Haiku 4.5", tier: "low", deprecated: false },
 		{ id: "anthropic/claude-sonnet-4-6", provider: "openrouter", label: "Claude Sonnet 4.6", tier: "mid", deprecated: false },
 		{ id: "google/gemini-2.5-flash", provider: "openrouter", label: "Gemini 2.5 Flash", tier: "low", deprecated: false },
 	],
@@ -231,6 +234,13 @@ async function discoverAnthropicModels(apiKey: string | undefined): Promise<Mode
 function inferOpenRouterTier(id: string): "high" | "mid" | "low" {
 	const normalized = id.toLowerCase();
 	if (
+		normalized.includes("-mini") ||
+		normalized.includes(":mini") ||
+		normalized.endsWith("mini")
+	) {
+		return "low";
+	}
+	if (
 		normalized.includes("opus") ||
 		normalized.includes("gpt-5") ||
 		normalized.includes("claude-4") ||
@@ -246,10 +256,6 @@ function inferOpenRouterTier(id: string): "high" | "mid" | "low" {
 		return "mid";
 	}
 	return "low";
-}
-
-function trimTrailingSlash(url: string): string {
-	return url.endsWith("/") ? url.slice(0, -1) : url;
 }
 
 async function discoverOpenRouterModels(

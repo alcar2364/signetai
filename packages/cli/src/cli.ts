@@ -1885,7 +1885,7 @@ async function existingSetupWizard(
 							: options.extractionProvider === "opencode"
 								? "anthropic/claude-haiku-4-5-20251001"
 							: options.extractionProvider === "openrouter"
-								? "openai/gpt-5.3-mini"
+								? "openai/gpt-4o-mini"
 								: "glm-4.7-flash"),
 				},
 				semanticContradictionEnabled: true,
@@ -2653,19 +2653,23 @@ async function setupWizard(options: SetupWizardOptions) {
 			extractionModel =
 				normalizeStringValue(options.extractionModel) ||
 				normalizeStringValue(existingMemory.pipelineV2?.extractionModel) ||
-				"openai/gpt-5.3-mini";
+				"openai/gpt-4o-mini";
 		} else {
 			console.log();
 			extractionModel = (await select({
 				message: "Which OpenRouter model for extraction? (provider/model format)",
 				choices: [
 					{
-						value: "openai/gpt-5.3-mini",
-						name: "openai/gpt-5.3-mini (fast, recommended)",
+						value: "openai/gpt-4o-mini",
+						name: "openai/gpt-4o-mini (fast, recommended)",
+					},
+					{
+						value: "openai/gpt-4o",
+						name: "openai/gpt-4o (higher quality)",
 					},
 					{
 						value: "anthropic/claude-sonnet-4-6",
-						name: "anthropic/claude-sonnet-4-6 (higher quality)",
+						name: "anthropic/claude-sonnet-4-6 (high quality)",
 					},
 					{
 						value: "google/gemini-2.5-flash",

@@ -255,13 +255,13 @@ describe("loadMemoryConfig", () => {
 			`memory:
   pipelineV2:
     extractionProvider: openrouter
-    extractionModel: openai/gpt-5.3-mini
+    extractionModel: openai/gpt-4o-mini
 `,
 		);
 
 		const cfg = loadMemoryConfig(agentsDir);
 		expect(cfg.pipelineV2.extraction.provider).toBe("openrouter");
-		expect(cfg.pipelineV2.extraction.model).toBe("openai/gpt-5.3-mini");
+		expect(cfg.pipelineV2.extraction.model).toBe("openai/gpt-4o-mini");
 	});
 });
 
@@ -331,13 +331,13 @@ describe("loadPipelineConfig", () => {
 				pipelineV2: {
 					synthesis: {
 						provider: "openrouter",
-						model: "openai/gpt-5.3-mini",
+						model: "openai/gpt-4o-mini",
 					},
 				},
 			},
 		});
 		expect(result.synthesis.provider).toBe("openrouter");
-		expect(result.synthesis.model).toBe("openai/gpt-5.3-mini");
+		expect(result.synthesis.model).toBe("openai/gpt-4o-mini");
 	});
 
 	it("flat provider without flat model uses provider default", () => {

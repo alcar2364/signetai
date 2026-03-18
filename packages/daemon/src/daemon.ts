@@ -9484,20 +9484,28 @@ async function main() {
 			effectiveExtractionProvider = "ollama";
 		}
 	}
+	const keyCache = new Map<"ANTHROPIC_API_KEY" | "OPENROUTER_API_KEY", string | undefined>();
+	const getKey = async (name: "ANTHROPIC_API_KEY" | "OPENROUTER_API_KEY"): Promise<string | undefined> => {
+		if (keyCache.has(name)) return keyCache.get(name);
+		let key = process.env[name];
+		if (!key) {
+			try {
+				key = await getSecret(name) ?? undefined;
+			} catch {
+				logger.warn("config", `Failed to resolve ${name} from secrets store`);
+			}
+		}
+		keyCache.set(name, key);
+		return key;
+	};
+
 	// Resolve Anthropic API key once — shared by extraction and synthesis
 	let anthropicApiKey: string | undefined;
 	const needsAnthropicForSynthesis =
 		memoryCfg.pipelineV2.synthesis.enabled &&
 		memoryCfg.pipelineV2.synthesis.provider === "anthropic";
 	if (effectiveExtractionProvider === "anthropic" || needsAnthropicForSynthesis) {
-		anthropicApiKey = process.env.ANTHROPIC_API_KEY;
-		if (!anthropicApiKey) {
-			try {
-				anthropicApiKey = await getSecret("ANTHROPIC_API_KEY") ?? undefined;
-			} catch {
-				logger.warn("config", "Failed to resolve ANTHROPIC_API_KEY from secrets store");
-			}
-		}
+		anthropicApiKey = await getKey("ANTHROPIC_API_KEY");
 		if (!anthropicApiKey) {
 			logger.error("config", "ANTHROPIC_API_KEY not found — falling back to ollama. Set via env or `signet secrets set ANTHROPIC_API_KEY`");
 			if (effectiveExtractionProvider === "anthropic") {
@@ -9515,14 +9523,7 @@ async function main() {
 		effectiveExtractionProvider === "openrouter" ||
 		needsOpenRouterForSynthesis
 	) {
-		openRouterApiKey = process.env.OPENROUTER_API_KEY;
-		if (!openRouterApiKey) {
-			try {
-				openRouterApiKey = await getSecret("OPENROUTER_API_KEY") ?? undefined;
-			} catch {
-				logger.warn("config", "Failed to resolve OPENROUTER_API_KEY from secrets store");
-			}
-		}
+		openRouterApiKey = await getKey("OPENROUTER_API_KEY");
 		if (!openRouterApiKey) {
 			logger.error(
 				"config",
@@ -9580,7 +9581,7 @@ async function main() {
 				})
 			: effectiveExtractionProvider === "openrouter" && openRouterApiKey
 				? createOpenRouterProvider({
-						model: effectiveExtractionModel || "openai/gpt-5.3-mini",
+						model: effectiveExtractionModel || "openai/gpt-4o-mini",
 						apiKey: openRouterApiKey,
 						baseUrl: extractionOpenRouterBaseUrl,
 						referer: readEnvTrimmed("OPENROUTER_HTTP_REFERER"),
@@ -9623,28 +9624,9 @@ async function main() {
 
 	// Initialize model registry for dynamic model discovery
 	if (memoryCfg.pipelineV2.modelRegistry.enabled) {
-		let registryAnthropicApiKey = anthropicApiKey;
-		if (!registryAnthropicApiKey) {
-			registryAnthropicApiKey = process.env.ANTHROPIC_API_KEY;
-			if (!registryAnthropicApiKey) {
-				try {
-					registryAnthropicApiKey = (await getSecret("ANTHROPIC_API_KEY")) ?? undefined;
-				} catch {
-					// ignore: registry can still run without Anthropic discovery
-				}
-			}
-		}
-		let registryOpenRouterApiKey = openRouterApiKey;
-		if (!registryOpenRouterApiKey) {
-			registryOpenRouterApiKey = process.env.OPENROUTER_API_KEY;
-			if (!registryOpenRouterApiKey) {
-				try {
-					registryOpenRouterApiKey = (await getSecret("OPENROUTER_API_KEY")) ?? undefined;
-				} catch {
-					// ignore: registry can still run without OpenRouter discovery
-				}
-			}
-		}
+		const registryAnthropicApiKey = anthropicApiKey ?? await getKey("ANTHROPIC_API_KEY");
+		const registryOpenRouterApiKey =
+			openRouterApiKey ?? await getKey("OPENROUTER_API_KEY");
 		initModelRegistry(
 			memoryCfg.pipelineV2.modelRegistry,
 			effectiveExtractionProvider === "ollama" ? extractionOllamaBaseUrl : undefined,
@@ -9763,7 +9745,7 @@ async function main() {
 					})
 				: effectiveSynthesisProvider === "openrouter" && openRouterApiKey
 					? createOpenRouterProvider({
-							model: effectiveSynthesisModel || "openai/gpt-5.3-mini",
+							model: effectiveSynthesisModel || "openai/gpt-4o-mini",
 							apiKey: openRouterApiKey,
 							baseUrl: synthesisOpenRouterBaseUrl,
 							referer: readEnvTrimmed("OPENROUTER_HTTP_REFERER"),

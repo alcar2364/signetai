@@ -68,8 +68,9 @@ const FALLBACK_MODEL_PRESETS: Record<string, Array<{ value: string; label: strin
 		{ value: "claude-3-5-haiku-20241022", label: "Claude 3.5 Haiku" },
 	],
 	"openrouter": [
-		{ value: "openai/gpt-5.3-mini", label: "GPT 5.3 Mini" },
-		{ value: "openai/gpt-5.3", label: "GPT 5.3" },
+		{ value: "openai/gpt-4o-mini", label: "GPT-4o Mini" },
+		{ value: "openai/gpt-4o", label: "GPT-4o" },
+		{ value: "anthropic/claude-haiku-4-5-20251001", label: "Claude Haiku 4.5" },
 		{ value: "anthropic/claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
 		{ value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash" },
 	],

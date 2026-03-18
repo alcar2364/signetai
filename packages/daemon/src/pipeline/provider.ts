@@ -11,6 +11,7 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 // node:child_process removed — using Bun.spawn directly for reliable I/O
 import { logger } from "../logger";
+import { trimTrailingSlash } from "./url";
 
 // ---------------------------------------------------------------------------
 // Global concurrency semaphore for CLI subprocess providers
@@ -206,10 +207,6 @@ export function resolveDefaultOllamaFallbackMaxContextTokens(): number {
 		parseOptionalPositiveInt(process.env.SIGNET_OLLAMA_FALLBACK_MAX_CTX)
 		?? DEFAULT_OLLAMA_FALLBACK_MAX_CONTEXT_TOKENS
 	);
-}
-
-function trimTrailingSlash(url: string): string {
-	return url.endsWith("/") ? url.slice(0, -1) : url;
 }
 
 interface OllamaGenerateResponse {
@@ -807,7 +804,7 @@ export interface OpenRouterProviderConfig {
 }
 
 const DEFAULT_OPENROUTER_CONFIG: OpenRouterProviderConfig = {
-	model: "openai/gpt-5.3-mini",
+	model: "openai/gpt-4o-mini",
 	apiKey: "",
 	baseUrl: "https://openrouter.ai/api/v1",
 	defaultTimeoutMs: 60000,
