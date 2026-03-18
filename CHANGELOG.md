@@ -2,6 +2,13 @@
 
 All notable changes to Signet are documented here.
 
+## [0.63.0] - 2026-03-18
+
+### Refactoring
+
+- **docs**: organize docs into research-to-implementation pipeline
+
+
 ## [0.62.0] - 2026-03-18
 
 ### Features
