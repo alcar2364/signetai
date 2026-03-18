@@ -2,6 +2,13 @@
 
 All notable changes to Signet are documented here.
 
+## [0.60.0] - 2026-03-18
+
+### Bug Fixes
+
+- vec_embeddings backfill race — use direct LEFT JOIN instead of count comparison
+
+
 ## [0.59.0] - 2026-03-18
 
 ### Features
