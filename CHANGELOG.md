@@ -2,6 +2,16 @@
 
 All notable changes to Signet are documented here.
 
+## [0.63.2] - 2026-03-18
+
+### Bug Fixes
+
+- address PR review feedback for version-sync
+- resolve three signet sync failures
+- address review — document spawnHidden throw safety, clarify Bun.which calls
+- resolve CLI binary paths on Windows for extraction/synthesis providers
+
+
 ## [0.63.1] - 2026-03-18
 
 ### Bug Fixes
