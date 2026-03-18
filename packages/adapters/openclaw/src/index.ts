@@ -9,6 +9,9 @@
  * path for dedup safety.
  */
 
+import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { Type } from "@sinclair/typebox";
 import type { OpenClawPluginApi, OpenClawToolResult } from "./openclaw-types.js";
 
@@ -354,6 +357,42 @@ export async function isDaemonRunning(daemonUrl = DEFAULT_DAEMON_URL): Promise<b
 }
 
 // ============================================================================
+// Static identity fallback when daemon is unreachable
+// ============================================================================
+
+const STATIC_FILES: ReadonlyArray<{ file: string; header: string; budget: number }> = [
+	{ file: "AGENTS.md", header: "Agent Instructions", budget: 12_000 },
+	{ file: "SOUL.md", header: "Soul", budget: 4_000 },
+	{ file: "IDENTITY.md", header: "Identity", budget: 2_000 },
+	{ file: "USER.md", header: "About Your User", budget: 6_000 },
+	{ file: "MEMORY.md", header: "Working Memory", budget: 10_000 },
+];
+
+function readStaticIdentity(): SessionStartResult | null {
+	const dir = process.env.SIGNET_PATH ?? join(homedir(), ".agents");
+	if (!existsSync(dir)) return null;
+	const parts: string[] = [];
+	for (const { file, header, budget } of STATIC_FILES) {
+		const path = join(dir, file);
+		if (!existsSync(path)) continue;
+		try {
+			const raw = readFileSync(path, "utf-8").trim();
+			if (!raw) continue;
+			const content = raw.length <= budget ? raw : `${raw.slice(0, budget)}\n[truncated]`;
+			parts.push(`## ${header}\n\n${content}`);
+		} catch {
+			// skip
+		}
+	}
+	if (parts.length === 0) return null;
+	return {
+		identity: { name: "signet" },
+		memories: [],
+		inject: `[signet: daemon offline — running with static identity]\n\n${parts.join("\n\n")}`,
+	};
+}
+
+// ============================================================================
 // Lifecycle callbacks
 // ============================================================================
 
@@ -366,17 +405,23 @@ export async function onSessionStart(
 		sessionKey?: string;
 	} = {},
 ): Promise<SessionStartResult | null> {
-	return daemonFetch(options.daemonUrl || DEFAULT_DAEMON_URL, "/api/hooks/session-start", {
-		method: "POST",
-		body: {
-			harness,
-			agentId: options.agentId,
-			context: options.context,
-			sessionKey: options.sessionKey,
-			runtimePath: RUNTIME_PATH,
+	const result = await daemonFetch<SessionStartResult>(
+		options.daemonUrl || DEFAULT_DAEMON_URL,
+		"/api/hooks/session-start",
+		{
+			method: "POST",
+			body: {
+				harness,
+				agentId: options.agentId,
+				context: options.context,
+				sessionKey: options.sessionKey,
+				runtimePath: RUNTIME_PATH,
+			},
+			timeout: READ_TIMEOUT,
 		},
-		timeout: READ_TIMEOUT,
-	});
+	);
+	if (result) return result;
+	return readStaticIdentity();
 }
 
 export async function onUserPromptSubmit(

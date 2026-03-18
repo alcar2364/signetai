@@ -11,6 +11,9 @@
  * ```
  */
 
+import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import type { Plugin } from "@opencode-ai/plugin";
 import { createDaemonClient } from "./daemon-client.js";
 import { createTools } from "./tools.js";
@@ -74,6 +77,38 @@ function readRuntimeEnv(name: string): string | undefined {
 }
 
 // ============================================================================
+// Static identity fallback when daemon is unreachable
+// ============================================================================
+
+const STATIC_FILES: ReadonlyArray<{ file: string; header: string; budget: number }> = [
+	{ file: "AGENTS.md", header: "Agent Instructions", budget: 12_000 },
+	{ file: "SOUL.md", header: "Soul", budget: 4_000 },
+	{ file: "IDENTITY.md", header: "Identity", budget: 2_000 },
+	{ file: "USER.md", header: "About Your User", budget: 6_000 },
+	{ file: "MEMORY.md", header: "Working Memory", budget: 10_000 },
+];
+
+function readStaticIdentity(): string {
+	const dir = readRuntimeEnv("SIGNET_PATH") ?? join(homedir(), ".agents");
+	if (!existsSync(dir)) return "";
+	const parts: string[] = [];
+	for (const { file, header, budget } of STATIC_FILES) {
+		const path = join(dir, file);
+		if (!existsSync(path)) continue;
+		try {
+			const raw = readFileSync(path, "utf-8").trim();
+			if (!raw) continue;
+			const content = raw.length <= budget ? raw : `${raw.slice(0, budget)}\n[truncated]`;
+			parts.push(`## ${header}\n\n${content}`);
+		} catch {
+			// skip
+		}
+	}
+	if (parts.length === 0) return "";
+	return `[signet: daemon offline — running with static identity]\n\n${parts.join("\n\n")}`;
+}
+
+// ============================================================================
 // Plugin
 // ============================================================================
 
@@ -101,7 +136,8 @@ export const SignetPlugin: Plugin = async ({ directory }) => {
 		);
 		sessionContext = result?.inject ?? result?.recentContext ?? "";
 	} catch {
-		// daemon not running — continue without memory context
+		// daemon not running — fall back to static identity files
+		sessionContext = readStaticIdentity();
 	}
 
 	return {

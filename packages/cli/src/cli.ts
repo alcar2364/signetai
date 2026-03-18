@@ -53,6 +53,7 @@ import {
 	resolvePrimaryPackageManager,
 	runMigrations,
 	symlinkSkills,
+	readStaticIdentity,
 	unifySkills,
 } from "@signet/core";
 import chalk from "chalk";
@@ -5325,7 +5326,17 @@ hookCmd
 		});
 
 		if (!data) {
-			process.stderr.write("[signet] daemon not running, hook skipped\n");
+			const fallback = readStaticIdentity(AGENTS_DIR);
+			if (fallback) {
+				process.stderr.write("[signet] daemon offline — using static identity\n");
+				if (options.json) {
+					console.log(JSON.stringify({ inject: fallback }));
+				} else {
+					console.log(fallback);
+				}
+			} else {
+				process.stderr.write("[signet] daemon not running, no identity files found\n");
+			}
 			process.exit(0);
 		}
 
