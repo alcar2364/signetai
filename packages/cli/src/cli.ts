@@ -647,6 +647,7 @@ const OPENCLAW_PLUGIN_PACKAGE = "@signetai/signet-memory-openclaw";
 const OPENCLAW_PLUGIN_SYNC_FILENAME = "openclaw-plugin-version";
 const PREDICTOR_SYNC_FILENAME = "predictor-version";
 const NATIVE_SYNC_LOCK_FILENAME = "sync-native.lock";
+const PREDICTOR_DOWNLOAD_TIMEOUT_MS = 60_000;
 
 function getVersionFromPackageJson(packageJsonPath: string): string | null {
 	if (!existsSync(packageJsonPath)) {
@@ -796,7 +797,10 @@ async function syncPredictorBinary(basePath: string): Promise<{
 	const url = `https://github.com/Signet-AI/signetai/releases/download/v${VERSION}/${binary.name}`;
 	let expected: string;
 	try {
-		const hashRes = await fetch(`${url}.sha256`, { redirect: "follow" });
+		const hashRes = await fetch(`${url}.sha256`, {
+			redirect: "follow",
+			signal: AbortSignal.timeout(PREDICTOR_DOWNLOAD_TIMEOUT_MS),
+		});
 		if (!hashRes.ok) {
 			return {
 				status: "error",
@@ -821,7 +825,10 @@ async function syncPredictorBinary(basePath: string): Promise<{
 
 	let res: Response;
 	try {
-		res = await fetch(url, { redirect: "follow" });
+		res = await fetch(url, {
+			redirect: "follow",
+			signal: AbortSignal.timeout(PREDICTOR_DOWNLOAD_TIMEOUT_MS),
+		});
 	} catch (err) {
 		return {
 			status: "error",
