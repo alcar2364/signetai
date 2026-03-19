@@ -2,6 +2,13 @@
 
 All notable changes to Signet are documented here.
 
+## [0.65.4] - 2026-03-19
+
+### Bug Fixes
+
+- use bash shell for cargo build steps on Windows runners (#239)
+
+
 ## [0.65.3] - 2026-03-19
 
 ### Bug Fixes
