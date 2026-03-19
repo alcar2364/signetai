@@ -1946,6 +1946,7 @@ interface ForgetCandidatesRequest {
 	sourceType: string;
 	since: string;
 	until: string;
+	scope: string | null;
 	limit: number;
 }
 
@@ -2144,6 +2145,12 @@ function buildForgetCandidatesWhere(req: ForgetCandidatesRequest, alias: string)
 	if (req.sourceType) {
 		parts.push(`${prefix}source_type = ?`);
 		args.push(req.sourceType);
+	}
+	if (req.scope !== null) {
+		parts.push(`${prefix}scope = ?`);
+		args.push(req.scope);
+	} else {
+		parts.push(`${prefix}scope IS NULL`);
 	}
 	if (req.since) {
 		parts.push(`${prefix}created_at >= ?`);
@@ -2373,6 +2380,7 @@ app.post("/api/memory/remember", async (c) => {
 		pinned?: boolean;
 		sourceType?: string;
 		sourceId?: string;
+		scope?: string | null;
 	};
 
 	try {
@@ -2383,6 +2391,7 @@ app.post("/api/memory/remember", async (c) => {
 
 	const raw = body.content?.trim();
 	if (!raw) return c.json({ error: "content is required" }, 400);
+	const scope = body.scope ?? null;
 
 	// Pipeline v2 kill switch: refuse writes when mutations are frozen
 	const fullCfg = loadMemoryConfig(AGENTS_DIR);
@@ -2463,6 +2472,7 @@ app.post("/api/memory/remember", async (c) => {
 						updatedBy: who,
 						sourceType: "chunk",
 						sourceId: groupId,
+						scope,
 						createdAt: now,
 					});
 
@@ -2635,6 +2645,7 @@ app.post("/api/memory/remember", async (c) => {
 				updatedBy: who,
 				sourceType,
 				sourceId,
+				scope,
 				createdAt: now,
 			});
 			return { deduped: false as const };
@@ -3353,6 +3364,7 @@ app.post("/api/memory/forget", async (c) => {
 		sourceType: parseOptionalString(payload.source_type) ?? "",
 		since: parseOptionalString(payload.since) ?? "",
 		until: parseOptionalString(payload.until) ?? "",
+		scope: parseOptionalString(payload.scope) ?? null,
 		limit,
 	};
 
@@ -3363,7 +3375,8 @@ app.post("/api/memory/forget", async (c) => {
 		request.who.length > 0 ||
 		request.sourceType.length > 0 ||
 		request.since.length > 0 ||
-		request.until.length > 0;
+		request.until.length > 0 ||
+		request.scope !== null;
 	if (ids.length === 0 && !hasQueryScope) {
 		return c.json(
 			{

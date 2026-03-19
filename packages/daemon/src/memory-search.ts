@@ -35,6 +35,7 @@ export interface RecallParams {
 	importance_min?: number;
 	since?: string;
 	until?: string;
+	scope?: string | null;
 }
 
 export interface RecallResult {
@@ -74,6 +75,19 @@ interface FilterClause {
 function buildFilterClause(params: RecallParams): FilterClause {
 	const parts: string[] = [];
 	const args: unknown[] = [];
+
+	// Scope isolation: explicit scope filters to that scope, undefined
+	// defaults to excluding all scoped memories from normal searches.
+	if (params.scope !== undefined) {
+		if (params.scope === null) {
+			parts.push("m.scope IS NULL");
+		} else {
+			parts.push("m.scope = ?");
+			args.push(params.scope);
+		}
+	} else {
+		parts.push("m.scope IS NULL");
+	}
 
 	if (params.type) {
 		parts.push("m.type = ?");
@@ -159,6 +173,11 @@ export async function hybridRecall(
 	const minScore = cfg.search.min_score;
 
 	const filter = buildFilterClause(params);
+	// When scope filtering is active, vector search can't filter at query
+	// time so out-of-scope IDs get dropped at hydration. Over-fetch to
+	// compensate so the final result count still hits `limit`.
+	const scoped = params.scope !== undefined;
+	const vecTopK = scoped ? cfg.search.top_k * 2 : cfg.search.top_k;
 
 	// --- BM25 keyword search via FTS5 ---
 	const bm25Map = new Map<string, number>();
@@ -203,7 +222,7 @@ export async function hybridRecall(
 			queryVecF32 = new Float32Array(queryVec);
 			getDbAccessor().withReadDb((db) => {
 				const vecResults = vectorSearch(db as any, queryVecF32!, {
-					limit: cfg.search.top_k,
+					limit: vecTopK,
 					type: params.type as "fact" | "preference" | "decision" | undefined,
 				});
 				for (const r of vecResults) {
@@ -457,6 +476,16 @@ export async function hybridRecall(
 	}
 
 	// --- Fetch full memory rows ---
+	// Scope filter on hydration catches vector-search results that bypassed
+	// the FTS filter clause (vectorSearch doesn't receive scope params).
+	const scopeClause =
+		params.scope !== undefined
+			? params.scope === null
+				? " AND scope IS NULL"
+				: " AND scope = ?"
+			: " AND scope IS NULL";
+	const scopeArgs: unknown[] =
+		params.scope !== undefined && params.scope !== null ? [params.scope] : [];
 	const placeholders = topIds.map(() => "?").join(", ");
 
 	const rows = getDbAccessor().withReadDb(
@@ -465,9 +494,9 @@ export async function hybridRecall(
 				.prepare(
 					`SELECT id, content, type, tags, pinned, importance, who, project, created_at
         FROM memories
-        WHERE id IN (${placeholders})`,
+        WHERE id IN (${placeholders})${scopeClause}`,
 				)
-				.all(...topIds) as Array<{
+				.all(...topIds, ...scopeArgs) as Array<{
 				id: string;
 				content: string;
 				type: string;
@@ -549,9 +578,10 @@ export async function hybridRecall(
 							 WHERE mem.entity_id IN (${ePlaceholders})
 							   AND m.type = 'rationale'
 							   AND m.is_deleted = 0
+							   ${scopeClause}
 							 LIMIT 10`,
 					)
-					.all(...eIds) as Array<{
+					.all(...eIds, ...scopeArgs) as Array<{
 					id: string;
 					content: string;
 					type: string;
