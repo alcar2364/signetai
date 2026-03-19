@@ -2,6 +2,13 @@
 
 All notable changes to Signet are documented here.
 
+## [0.65.8] - 2026-03-19
+
+### Bug Fixes
+
+- MCP stdio server process leak on session end (#243)
+
+
 ## [0.65.7] - 2026-03-19
 
 ### Bug Fixes
