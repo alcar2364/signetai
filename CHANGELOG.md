@@ -2,6 +2,13 @@
 
 All notable changes to Signet are documented here.
 
+## [0.69.2] - 2026-03-20
+
+### Bug Fixes
+
+- install tray deps explicitly in desktop build workflow
+
+
 ## [0.69.1] - 2026-03-20
 
 ### Bug Fixes
