@@ -4,7 +4,7 @@ import type { Hono } from "hono";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import type { SignetAppManifest } from "@signet/core";
+import type { AutoCardToolAction, AutoCardResource, SignetAppManifest } from "@signet/core";
 
 import { isPrivateHostname } from "../url-validation.js";
 import {
@@ -70,10 +70,71 @@ function findFreeGridPosition(
  */
 export function mountAppTrayRoutes(app: Hono): void {
 	/**
-	 * GET /api/os/tray — list all app tray entries
+	 * GET /api/os/tray — list all app tray entries.
+	 * Automatically syncs installed MCP servers that are missing
+	 * from the tray so pre-installed apps appear without manual
+	 * probe/install actions.
 	 */
 	app.get("/api/os/tray", (c) => {
 		const tray = loadAppTray();
+		const installed = readInstalledServersPublic();
+		const trayIds = new Set(tray.map((e) => e.id));
+
+		const missing = installed.filter(
+			(s) => s.enabled && !trayIds.has(s.id),
+		);
+
+		if (missing.length > 0) {
+			const now = new Date().toISOString();
+			const stubs = missing.map((server) => ({
+				id: server.id,
+				name: server.name,
+				icon: null as string | null,
+				state: "tray" as const,
+				manifest: {
+					name: server.name,
+					defaultSize: { w: 4, h: 3 },
+				},
+				autoCard: {
+					name: server.name,
+					tools: [] as AutoCardToolAction[],
+					resources: [] as AutoCardResource[],
+					hasAppResources: false,
+					defaultSize: { w: 4, h: 3 },
+				},
+				hasDeclaredManifest: false,
+				createdAt: now,
+				updatedAt: now,
+			}));
+
+			// Best-effort persist: reload the latest tray before writing
+			// to avoid overwriting concurrent PATCH updates
+			try {
+				ensureMarketplaceDir();
+				const fresh = loadAppTray();
+				const freshIds = new Set(fresh.map((e) => e.id));
+				const toAdd = stubs.filter((s) => !freshIds.has(s.id));
+				if (toAdd.length > 0) {
+					writeFileSync(
+						join(getMarketplaceDir(), "app-tray.json"),
+						JSON.stringify([...fresh, ...toAdd], null, 2),
+					);
+				}
+				logger.info(
+					"os",
+					`Synced ${toAdd.length} installed server(s) to app tray`,
+				);
+			} catch (err) {
+				logger.warn(
+					"os",
+					`Failed to persist auto-synced tray entries: ${err}`,
+				);
+			}
+
+			// Return the merged view regardless of persist success
+			for (const stub of stubs) tray.push(stub);
+		}
+
 		return c.json({
 			entries: tray,
 			count: tray.length,
