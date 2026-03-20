@@ -2,6 +2,13 @@
 
 All notable changes to Signet are documented here.
 
+## [0.69.1] - 2026-03-20
+
+### Bug Fixes
+
+- use RELEASE_PAT in release workflow for branch protection bypass
+
+
 ## [0.69.0] - 2026-03-20
 
 ### Bug Fixes
