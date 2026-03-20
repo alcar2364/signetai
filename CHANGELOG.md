@@ -2,6 +2,13 @@
 
 All notable changes to Signet are documented here.
 
+## [0.67.0] - 2026-03-20
+
+### Features
+
+- Signet OS v2 — sandboxed widget rendering, LLM auto-generation, MCP app dashboard
+
+
 ## [0.66.1] - 2026-03-19
 
 ### Features
