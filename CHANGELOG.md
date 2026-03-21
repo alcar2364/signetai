@@ -2,6 +2,13 @@
 
 All notable changes to Signet are documented here.
 
+## [0.71.3] - 2026-03-21
+
+### Bug Fixes
+
+- **tray**: cross-platform build script for Windows CI (#262)
+
+
 ## [0.71.2] - 2026-03-21
 
 ### Bug Fixes
