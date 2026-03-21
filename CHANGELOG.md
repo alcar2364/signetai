@@ -2,6 +2,13 @@
 
 All notable changes to Signet are documented here.
 
+## [0.70.0] - 2026-03-21
+
+### Features
+
+- **connector-codex**: native hooks + MCP for full mid-session memory (#258)
+
+
 ## [0.69.5] - 2026-03-21
 
 ### Features
