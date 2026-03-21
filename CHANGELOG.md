@@ -2,6 +2,13 @@
 
 All notable changes to Signet are documented here.
 
+## [0.71.0] - 2026-03-21
+
+### Bug Fixes
+
+- **tray**: revert to cargo tauri CLI, convert icons to RGBA (#260)
+
+
 ## [0.70.0] - 2026-03-21
 
 ### Features
