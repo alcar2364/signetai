@@ -2,6 +2,13 @@
 
 All notable changes to Signet are documented here.
 
+## [0.73.0] - 2026-03-22
+
+### Bug Fixes
+
+- task run output display — stdin close, chunk normalization, terminal rendering (#283)
+
+
 ## [0.72.8] - 2026-03-22
 
 ### Features
