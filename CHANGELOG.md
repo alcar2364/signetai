@@ -2,6 +2,13 @@
 
 All notable changes to Signet are documented here.
 
+## [0.72.4] - 2026-03-22
+
+### Bug Fixes
+
+- resolve daemon path in published bundle (#274)
+
+
 ## [0.72.2] - 2026-03-22
 
 ### Bug Fixes
