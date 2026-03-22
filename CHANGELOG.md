@@ -2,6 +2,13 @@
 
 All notable changes to Signet are documented here.
 
+## [0.73.1] - 2026-03-22
+
+### Bug Fixes
+
+- **daemon**: normalize Claude Code transcript records (#284)
+
+
 ## [0.73.0] - 2026-03-22
 
 ### Bug Fixes
