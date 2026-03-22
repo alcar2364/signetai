@@ -1207,12 +1207,29 @@ function getDashboardPath(): string | null {
 // Create the Hono app
 export const app = new Hono();
 
-// Middleware
-app.use("*", cors());
+// Middleware — restrict CORS to localhost origins only
+const ALLOWED_ORIGINS = new Set([
+	"http://localhost:3850",
+	"http://127.0.0.1:3850",
+	"http://localhost:5173",
+	"http://127.0.0.1:5173",
+	"tauri://localhost",
+	"http://tauri.localhost",
+]);
+app.use("*", cors({
+	origin: (origin) => ALLOWED_ORIGINS.has(origin) ? origin : null,
+	credentials: true,
+}));
 
 // Auth middleware — reads from module-level authConfig/authSecret
 // which are initialized properly in main(). In local mode this is a no-op.
+// Guard: reject requests if auth is required but secret isn't initialized yet
+// (startup race between middleware registration and main() completing).
 app.use("*", async (c, next) => {
+	if (authConfig.mode !== "local" && !authSecret) {
+		c.status(503);
+		return c.json({ error: "server initializing" });
+	}
 	const mw = createAuthMiddleware(authConfig, authSecret);
 	return mw(c, next);
 });
@@ -1510,6 +1527,40 @@ app.use("/api/repair/*", async (c, next) => {
 	return requirePermission("admin", authConfig)(c, next);
 });
 
+// Secrets — admin only (can exec commands, exfiltrate secrets)
+app.use("/api/secrets", async (c, next) => {
+	return requirePermission("admin", authConfig)(c, next);
+});
+app.use("/api/secrets/*", async (c, next) => {
+	return requirePermission("admin", authConfig)(c, next);
+});
+
+// Git operations — admin only (can push, change remotes)
+app.use("/api/git/*", async (c, next) => {
+	return requirePermission("admin", authConfig)(c, next);
+});
+
+// Troubleshooter — admin only (can stop/restart daemon, run CLI commands)
+app.use("/api/troubleshoot/*", async (c, next) => {
+	return requirePermission("admin", authConfig)(c, next);
+});
+
+// Config writes — admin only (can overwrite agent.yaml, AGENTS.md)
+// Reject oversized bodies: content-length fast path + post-buffer check
+// for chunked encoding. The server-level REQUEST_BODY_LIMIT caps all
+// routes, but this gives a clear per-route error message.
+const MAX_CONFIG_BYTES = 1_048_576;
+app.use("/api/config", async (c, next) => {
+	if (c.req.method === "POST") {
+		const cl = c.req.header("content-length");
+		if (cl && Number(cl) > MAX_CONFIG_BYTES) {
+			return c.json({ error: `payload exceeds ${MAX_CONFIG_BYTES} byte limit` }, 413);
+		}
+		return requirePermission("admin", authConfig)(c, next);
+	}
+	return next();
+});
+
 // Per-memory PATCH and DELETE need method-specific guards + scope check
 app.use("/api/memory/:id", async (c, next) => {
 	// Scope enforcement on mutations: if token has project scope, verify
@@ -1657,6 +1708,11 @@ app.post("/api/config", async (c) => {
 
 		if (!file || typeof content !== "string") {
 			return c.json({ error: "Invalid request" }, 400);
+		}
+
+		// Defense-in-depth: also check after parse (content-length can be absent)
+		if (content.length > MAX_CONFIG_BYTES) {
+			return c.json({ error: `content exceeds ${MAX_CONFIG_BYTES} byte limit` }, 413);
 		}
 
 		if (file.includes("/") || file.includes("..")) {
@@ -10475,12 +10531,44 @@ async function main() {
 	initFeatureFlags(AGENTS_DIR);
 	startUpdateTimer();
 
-	// Start HTTP server
+	// Start HTTP server with global body size limit (10MB) to prevent
+	// OOM from chunked-encoding requests that bypass content-length checks.
+	const REQUEST_BODY_LIMIT = 10 * 1_048_576;
+	const { createServer: nodeCreateServer } = await import("node:http");
+	const createBoundedServer: typeof nodeCreateServer = (...args: Parameters<typeof nodeCreateServer>) => {
+		const server = nodeCreateServer(...args);
+		server.on("request", (req, res) => {
+			let bytes = 0;
+			let aborted = false;
+			req.on("data", (chunk: Buffer) => {
+				if (aborted) return;
+				bytes += chunk.length;
+				if (bytes > REQUEST_BODY_LIMIT) {
+					aborted = true;
+					logger.warn("http", "Request body exceeded limit", { bytes, limit: REQUEST_BODY_LIMIT });
+					// Send a proper 413 then destroy the socket so Hono's handler
+					// doesn't try to write a second response (ERR_HTTP_HEADERS_SENT).
+					if (!res.headersSent) {
+						res.writeHead(413, { "Content-Type": "application/json" });
+						res.end(JSON.stringify({ error: "payload too large" }), () => {
+							// Destroy after flush so Hono's subsequent write fails
+							// silently on a closed socket rather than emitting
+							// ERR_HTTP_HEADERS_SENT on a finished response.
+							req.socket?.destroy();
+						});
+					}
+				}
+			});
+		});
+		return server;
+	};
+
 	serve(
 		{
 			fetch: app.fetch,
 			port: PORT,
 			hostname: BIND_HOST,
+			createServer: createBoundedServer,
 		},
 		(info) => {
 			logger.info("daemon", "Server listening", {

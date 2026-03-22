@@ -222,15 +222,34 @@ export function deleteSecret(name: string): boolean {
 	return true;
 }
 
+// Belt-and-suspenders: reject obvious shell metacharacters even though
+// we no longer use sh -c. Catches injection attempts early with a
+// clear error message before argv parsing.
+const SHELL_META = /[;&|`$(){}[\]<>!\\]/;
+
 /**
  * Spawn a subprocess with one or more secrets injected as environment
  * variables. The agent only supplies references (env var names), never
  * the actual values.
  *
- * @param command  Shell command string to execute
+ * Uses direct argv execution (no shell) to eliminate glob/tilde/pipe
+ * expansion. The command string is parsed into argv tokens.
+ *
+ * @param command  Command string to execute (parsed as argv, no shell)
  * @param secretRefs  Map of env var name → secret name, e.g. { OPENAI_API_KEY: "OPENAI_API_KEY" }
  */
 export async function execWithSecrets(command: string, secretRefs: Record<string, string>): Promise<ExecResult> {
+	if (SHELL_META.test(command)) {
+		return { stdout: "", stderr: "command contains disallowed shell metacharacters", code: 1 };
+	}
+
+	// Parse command into argv — no shell, so no glob/tilde/pipe expansion
+	const argv = command.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g);
+	if (!argv || argv.length === 0) {
+		return { stdout: "", stderr: "empty command", code: 1 };
+	}
+	const cmd = argv.map((a) => a.replace(/^["']|["']$/g, ""));
+
 	// Resolve all secret values up front so we can redact them from output
 	const resolved: Record<string, string> = {};
 	for (const [envVar, secretName] of Object.entries(secretRefs)) {
@@ -249,10 +268,8 @@ export async function execWithSecrets(command: string, secretRefs: Record<string
 		return out;
 	}
 
-	const shell = process.platform === "win32" ? "cmd" : "sh";
-	const shellArgs = process.platform === "win32" ? ["/c", command] : ["-c", command];
 	return new Promise((resolve, reject) => {
-		const proc = spawn(shell, shellArgs, {
+		const proc = spawn(cmd[0], cmd.slice(1), {
 			env: { ...process.env, ...resolved },
 			stdio: "pipe",
 			windowsHide: true,
