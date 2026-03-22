@@ -3,7 +3,9 @@ import FormField from "$lib/components/config/FormField.svelte";
 import FormSection from "$lib/components/config/FormSection.svelte";
 import * as Select from "$lib/components/ui/select/index.js";
 import { st } from "$lib/stores/settings.svelte";
-import { NETWORK_MODES } from "@signet/core";
+// Duplicated from @signet/core/network — core is a Node.js bundle and
+// cannot be imported into the browser dashboard build.
+const NETWORK_MODES = ["localhost", "tailscale"] as const;
 
 const selectTriggerClass =
 	"font-[family-name:var(--font-mono)] text-[11px] text-[var(--sig-text)] bg-[var(--sig-bg)] border-[var(--sig-border-strong)] rounded-lg w-full h-auto min-h-[30px] px-2 py-[5px] box-border focus-visible:border-[var(--sig-accent)]";
