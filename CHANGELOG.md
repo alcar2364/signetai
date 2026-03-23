@@ -2,6 +2,13 @@
 
 All notable changes to Signet are documented here.
 
+## [0.73.4] - 2026-03-23
+
+### Bug Fixes
+
+- 5 critical memory and injection stability fixes (#291)
+
+
 ## [0.73.3] - 2026-03-23
 
 ### Bug Fixes
