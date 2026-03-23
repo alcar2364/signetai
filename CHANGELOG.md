@@ -2,6 +2,13 @@
 
 All notable changes to Signet are documented here.
 
+## [0.73.3] - 2026-03-23
+
+### Bug Fixes
+
+- **daemon**: align embedding-tracker hash with normalizeAndHashContent (#286)
+
+
 ## [0.73.2] - 2026-03-23
 
 ### Bug Fixes
