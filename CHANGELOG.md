@@ -2,6 +2,13 @@
 
 All notable changes to Signet are documented here.
 
+## [0.73.6] - 2026-03-23
+
+### Bug Fixes
+
+- wire marketplace reviews sync to production Worker endpoint (#293)
+
+
 ## [0.73.4] - 2026-03-23
 
 ### Bug Fixes
