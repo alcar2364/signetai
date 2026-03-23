@@ -308,6 +308,18 @@ function parseJsonOrJson5(raw: string): JsonObject {
 	}
 }
 
+/**
+ * Write a .signet-backup copy of the config before patching. Best-effort —
+ * a failure here must not block the patch itself.
+ */
+function backupConfig(configPath: string, raw: string): void {
+	try {
+		writeFileSync(`${configPath}.signet-backup`, raw, "utf-8");
+	} catch {
+		// best-effort
+	}
+}
+
 // ============================================================================
 // OpenClaw Connector
 // ============================================================================
@@ -573,6 +585,7 @@ export class OpenClawConnector extends BaseConnector {
 				}
 
 				config.plugins = pluginsObj;
+				backupConfig(configPath, raw);
 				atomicWriteJson(configPath, config, indent);
 				patched.push(configPath);
 			} catch (e) {
@@ -869,6 +882,7 @@ export class OpenClawConnector extends BaseConnector {
 				config.plugins = pluginsObj;
 
 				deepMerge(config, patch);
+				backupConfig(configPath, raw);
 				atomicWriteJson(configPath, config, indent);
 				patched.push(configPath);
 			} catch (e) {
@@ -914,6 +928,7 @@ export class OpenClawConnector extends BaseConnector {
 		}
 
 		const indent = this.detectIndent(raw);
+		backupConfig(configPath, raw);
 		deepMerge(config, patch);
 		atomicWriteJson(configPath, config, indent);
 	}
@@ -994,6 +1009,7 @@ export class OpenClawConnector extends BaseConnector {
 
 				if (dirty) {
 					config.plugins = pluginsObj;
+					backupConfig(configPath, raw);
 					atomicWriteJson(configPath, config, indent);
 					patched.push(configPath);
 				}
