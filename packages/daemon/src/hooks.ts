@@ -15,6 +15,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSyn
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { parseSimpleYaml } from "@signet/core";
+import { resolveAgentId } from "./agent-id";
 import {
 	clearContinuity,
 	consumeState,
@@ -1046,7 +1047,7 @@ export async function handleSessionStart(req: SessionStartRequest): Promise<Sess
 		allCandidates.map((candidate) => [candidate.id, "effective" as const]),
 	);
 
-	const traversalAgentId = req.agentId ?? "default";
+	const traversalAgentId = resolveAgentId(req);
 	let traversalFocalSource: "project" | "checkpoint" | "query" | "session_key" | null = null;
 	let traversalEntities = 0;
 	let traversalEntityNames: ReadonlyArray<string> = [];
@@ -1381,7 +1382,7 @@ export async function handleSessionStart(req: SessionStartRequest): Promise<Sess
 
 	if (req.project) {
 		const peerSessions = listAgentPresence({
-			agentId: req.agentId ?? "default",
+			agentId: resolveAgentId(req),
 			sessionKey: req.sessionKey,
 			project: req.project,
 			includeSelf: false,
@@ -1891,7 +1892,7 @@ export async function handleUserPromptSubmit(req: UserPromptSubmitRequest): Prom
 		try {
 			const parsed = parseFeedback(req.memory_feedback);
 			if (parsed) {
-				recordAgentFeedback(req.sessionKey, parsed, req.agentId ?? "default");
+				recordAgentFeedback(req.sessionKey, parsed, resolveAgentId(req));
 			} else {
 				logger.warn("hooks", "Invalid memory_feedback format, skipping", {
 					sessionKey: req.sessionKey,
@@ -1990,7 +1991,7 @@ export async function handleUserPromptSubmit(req: UserPromptSubmitRequest): Prom
 
 		// Track FTS hits for predictive scorer data collection (full results, pre-dedup)
 		const allMatchedIds = recall.results.map((result) => result.id);
-		trackFtsHits(req.sessionKey, allMatchedIds, req.agentId ?? "default");
+		trackFtsHits(req.sessionKey, allMatchedIds, resolveAgentId(req));
 
 		// Filter out memories already injected within the sliding window
 		let selected = budgetSelected;
@@ -2069,7 +2070,7 @@ export async function handleUserPromptSubmit(req: UserPromptSubmitRequest): Prom
 
 export function handleSessionEnd(req: SessionEndRequest): SessionEndResponse {
 	const sessionKey = req.sessionKey || req.sessionId;
-	const agentId = "default";
+	const agentId = resolveAgentId({ agentId: req.agentId, sessionKey: req.sessionKey || req.sessionId });
 
 	// Clear hook dedup state for this session
 	if (sessionKey) {
