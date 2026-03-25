@@ -2,6 +2,13 @@
 
 All notable changes to Signet are documented here.
 
+## [0.77.0] - 2026-03-25
+
+### Bug Fixes
+
+- **daemon**: keep startup recovery responsive on large databases (#332)
+
+
 ## [0.76.6] - 2026-03-25
 
 ### Features
