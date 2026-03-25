@@ -2,6 +2,13 @@
 
 All notable changes to Signet are documented here.
 
+## [0.76.6] - 2026-03-25
+
+### Features
+
+- **pipeline**: add live pause controls (#329)
+
+
 ## [0.76.5] - 2026-03-25
 
 ### Bug Fixes
