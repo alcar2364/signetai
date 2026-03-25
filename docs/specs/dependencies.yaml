@@ -328,10 +328,11 @@ specs:
       - docs/research/technical/SSM-LITERATURE-REVIEW.md
       - docs/research/technical/SYNTHETIC-DATA-GENERATION.md
       - docs/research/technical/ssm-implementations-survey.md
+      - "arxiv:2601.07372 (Engram: Conditional Memory via Scalable Lookup)"
     success_criteria:
-      - "SSM benchmark harness is reproducible across fixed datasets and seeds"
-      - "Temporal canary tests verify non-trivial pattern learning"
-      - "Ablation reports compare SSM candidates against current scorer on NDCG@10, MRR, and temporal precision"
+      - "SSM candidate baseline can be trained and evaluated on reproducible benchmark suites"
+      - "Canary tests prove temporal pattern learning beyond static score heuristics"
+      - "Ablations compare SSM vs current scorer on MRR, NDCG@10, and temporal precision"
     decision: null
 
   - id: ssm-temporal-backbone
@@ -339,16 +340,17 @@ specs:
     path: docs/specs/planning/ssm-temporal-backbone.md
     hard_depends_on:
       - ssm-foundation-evaluation
-      - ontology-evolution-core
       - session-continuity-protocol
     soft_depends_on:
       - predictive-memory-scorer
+      - ontology-evolution-core
     blocks:
       - ssm-graph-traversal-model
     informed_by:
       - docs/research/technical/RESEARCH-SSM-INTEGRATION.md
       - docs/research/technical/SSM-CONTINUAL-LEARNING-DEEP-DIVE.md
       - docs/research/technical/SSM-NOVEL-APPLICATIONS.md
+      - "arxiv:2601.07372 (Engram: Conditional Memory via Scalable Lookup)"
     success_criteria:
       - "Temporal SSM sidecar improves long-gap and supersession-sensitive ranking slices"
       - "Learned decay behavior outperforms fixed decay heuristics on benchmark canaries"
@@ -369,6 +371,7 @@ specs:
       - docs/research/technical/SSM-GRAPH-INTERSECTION.md
       - docs/research/technical/RESEARCH-SSM-INTEGRATION.md
       - docs/research/technical/SSM-LITERATURE-REVIEW.md
+      - "arxiv:2601.07372 (Engram: Conditional Memory via Scalable Lookup)"
     success_criteria:
       - "SSM-assisted path ranking improves multi-hop retrieval quality over static scoring"
       - "Graph-conditioned scoring respects constraint-surfacing and traversal bounds invariants"

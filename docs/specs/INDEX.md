@@ -400,7 +400,10 @@ cannot suppress them. This is a hard retrieval invariant.
 - `ssm-graph-traversal-model` may re-rank traversal paths but cannot alter
   traversal bounds, agent scoping, or constraint surfacing invariants.
 - SSM features consume ontology signals (`confidence`, relationship type,
-  co-occurrence, lineage), so ontology evolution is a hard prerequisite.
+  co-occurrence, lineage) when available. `ontology-evolution-core` is a
+  soft dependency for `ssm-temporal-backbone` and `ssm-graph-traversal-model`
+  (both handle missing signals gracefully with zero defaults) and is not
+  required by `ssm-foundation-evaluation`.
 
 ### Multi-Agent <-> All Specs
 
