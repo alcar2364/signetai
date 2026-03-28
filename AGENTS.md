@@ -14,8 +14,15 @@ This file provides guidance to AI assistants working on this repository.
 It is version controlled and co-maintained by human developers and AI
 assistants. Changes to this document should be thoughtful and express good judgement.
 
-Session Protocol (MANDATORY)
----
+## Workspace instruction source of truth
+
+Use this root `AGENTS.md` as the single workspace-wide instruction file.
+Do not add `.github/copilot-instructions.md` alongside it unless this file
+is being intentionally replaced across tools in the same change. Prefer
+linking to canonical docs from here instead of duplicating repo guidance in
+multiple instruction files.
+
+## Session Protocol (MANDATORY)
 
 Before starting any new feature, implementation, fix, refactor, or review,
 agents MUST:
@@ -29,8 +36,7 @@ agents MUST:
 If work is not represented in the spec system, add a planning stub first (or update
 a relevant existing spec) before implementation.
 
-Incident -> Guardrail Loop (MANDATORY)
----
+## Incident -> Guardrail Loop (MANDATORY)
 
 When a bug/regression/incident is discovered (in CI, review, or production),
 the fix is not complete until at least one durable prevention mechanism is added:
@@ -41,8 +47,7 @@ the fix is not complete until at least one durable prevention mechanism is added
 
 Every incident should leave the codebase harder to break in the same way twice.
 
-Recurring PR Failure Modes (Last 2 Weeks)
----
+## Recurring PR Failure Modes (Last 2 Weeks)
 
 The most frequent reviewer callouts across high-comment / high-size PRs
 (PRs #253, #267, #210, #217, #295, #202, #203, #211, #195, #277)
@@ -87,8 +92,7 @@ were the following. Prevent them proactively:
    - Run lint and remove dead variables/imports before review.
    - Keep inline comments aligned with actual implementation behavior.
 
-PR Readiness Checklist (MANDATORY Before Opening PR)
----
+## PR Readiness Checklist (MANDATORY Before Opening PR)
 
 - [ ] Spec alignment validated (`INDEX.md` + `dependencies.yaml`).
 - [ ] Agent scoping verified on all new/changed data queries.
@@ -99,24 +103,22 @@ PR Readiness Checklist (MANDATORY Before Opening PR)
 - [ ] Regression tests added for each bug fix.
 - [ ] Lint/typecheck/tests pass locally.
 
-Core Priorities
----
+## Core Priorities
 
 1. Performance.
 2. Reliability.
 3. Keep behavior predictable under load and during failures (session
-restarts, reconnects, partial streams).
+   restarts, reconnects, partial streams).
 4. If a tradeoff is required, choose correctness and robustness over short-term
-convenience.
+   convenience.
 5. All codebase changes are reviewed by agents during CI/CD, as well as human developers.
 6. Long term maintainability is a core priority. If you add new functionality,
-first check if there are shared logic that can be extracted to a separate module.
+   first check if there are shared logic that can be extracted to a separate module.
 7. Duplicate logic across mulitple files is a code smell and should be avoided.
 8. Don't be afraid to change existing code.
 9. Don't take shortcuts by just adding local logic to solve a problem.
 
-Commands
----
+## Commands
 
 ```bash
 bun install              # Install dependencies
@@ -148,8 +150,7 @@ Test discovery is scoped to `packages/` via `bunfig.toml` (excludes
 bun test packages/daemon/src/pipeline/worker.test.ts
 ```
 
-Individual Package Builds
----
+## Individual Package Builds
 
 ```bash
 # Core library (target: node)
@@ -197,30 +198,30 @@ bun run deploy   # Deploy to Cloudflare (wrangler)
 
 ## Packages
 
-| Package | Description | Target |
-|---------|-------------|--------|
-| `@signet/core` | Core library: types, database, search, manifest, identity | node |
-| `@signet/connector-base` | Shared connector primitives/utilities | node |
-| `@signet/cli` | CLI tool: setup wizard, daemon management | node |
-| `@signet/daemon` | Background service: HTTP API, MCP server, file watching | bun |
-| `@signet/extension` | Browser extension: popup dashboard, highlight-to-remember | browser |
-| `@signet/sdk` | Integration SDK for third-party apps | node |
-| `@signet/connector-claude-code` | Claude Code connector: hooks, CLAUDE.md generation | node |
-| `@signet/connector-opencode` | OpenCode connector: plugin, AGENTS.md sync | node |
-| `@signet/connector-openclaw` | OpenClaw connector: config patching, hook handlers | node |
-| `@signet/connector-codex` | Codex CLI connector: hooks and plugin | node |
-| `@signet/opencode-plugin` | OpenCode runtime plugin: memory tools and session hooks | node |
-| `@signetai/signet-memory-openclaw` | OpenClaw runtime plugin for calling Signet daemon | node |
-| `@signet/tray` | System tray application | node |
-| `signetai` | Meta-package bundling CLI + daemon | - |
-| `@signet/web` | Marketing website (Astro static, Cloudflare Pages) | cloudflare |
-| `@signet/native` | Native accelerators (SIMD vector ops, napi-rs) | node |
-| `predictor` | Predictive memory scorer sidecar (Rust) | rust |
-
+| Package                            | Description                                               | Target     |
+| ---------------------------------- | --------------------------------------------------------- | ---------- |
+| `@signet/core`                     | Core library: types, database, search, manifest, identity | node       |
+| `@signet/connector-base`           | Shared connector primitives/utilities                     | node       |
+| `@signet/cli`                      | CLI tool: setup wizard, daemon management                 | node       |
+| `@signet/daemon`                   | Background service: HTTP API, MCP server, file watching   | bun        |
+| `@signet/extension`                | Browser extension: popup dashboard, highlight-to-remember | browser    |
+| `@signet/sdk`                      | Integration SDK for third-party apps                      | node       |
+| `@signet/connector-claude-code`    | Claude Code connector: hooks, CLAUDE.md generation        | node       |
+| `@signet/connector-opencode`       | OpenCode connector: plugin, AGENTS.md sync                | node       |
+| `@signet/connector-openclaw`       | OpenClaw connector: config patching, hook handlers        | node       |
+| `@signet/connector-codex`          | Codex CLI connector: hooks and plugin                     | node       |
+| `@signet/opencode-plugin`          | OpenCode runtime plugin: memory tools and session hooks   | node       |
+| `@signetai/signet-memory-openclaw` | OpenClaw runtime plugin for calling Signet daemon         | node       |
+| `@signet/tray`                     | System tray application                                   | node       |
+| `signetai`                         | Meta-package bundling CLI + daemon                        | -          |
+| `@signet/web`                      | Marketing website (Astro static, Cloudflare Pages)        | cloudflare |
+| `@signet/native`                   | Native accelerators (SIMD vector ops, napi-rs)            | node       |
+| `predictor`                        | Predictive memory scorer sidecar (Rust)                   | rust       |
 
 ### Package Responsibilities
 
 **@signet/core** - Shared foundation
+
 - TypeScript interfaces (AgentManifest, Memory, etc.)
 - SQLite database wrapper with FTS5
 - Hybrid search (vector + keyword)
@@ -228,6 +229,7 @@ bun run deploy   # Deploy to Cloudflare (wrangler)
 - Constants and utilities
 
 **@signet/cli** - User interface (modular command surface + setup flows)
+
 - Setup wizard with harness selection
 - Config editor (`signet configure`)
 - Daemon start/stop/status
@@ -256,9 +258,11 @@ bun run deploy   # Deploy to Cloudflare (wrangler)
   with `getUpdateState()` / `getUpdateSummary()` accessors
 
 **@signet/sdk** - Third-party integration
+
 - SignetSDK class for embedding Signet in apps
 
-**@signet/connector-* packages** - Platform-specific connectors (install-time)
+**@signet/connector-\* packages** - Platform-specific connectors (install-time)
+
 - Install hooks into harness config files
 - Generate harness-specific CLAUDE.md/AGENTS.md
 - Symlink skills directories
@@ -267,6 +271,7 @@ bun run deploy   # Deploy to Cloudflare (wrangler)
   daemon-side runtime connector framework (filesystem watch, registry)
 
 **@signet/web** - Marketing website
+
 - Astro static site deployed to Cloudflare Pages
 - `web/src/pages/` — Astro page routes
 - `web/src/components/` — Reusable UI components
@@ -317,6 +322,7 @@ modes: `shadowMode` (extract without writing), `mutationsFrozen`
 (reads only), `graphEnabled`, `autonomousEnabled`.
 
 Notable pipeline files beyond the main worker:
+
 - `summary-worker.ts` — async session-end summarizer (writes dated .md)
 - `reranker.ts` — search result re-ranking
 - `url-fetcher.ts` — URL content fetching for document ingest
@@ -374,8 +380,7 @@ $SIGNET_WORKSPACE/
     └── logs/        # Daemon logs
 ```
 
-Style & Conventions
----
+## Style & Conventions
 
 - Package manager: **bun**
 - Linting/formatting: **Biome**
@@ -417,15 +422,15 @@ Style & Conventions
 
 For detailed style examples with code, see [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md).
 
-Testing Philosophy
----
+## Testing Philosophy
 
-Tests are the rewrite contract. Every test should encode *what must
-be true* (the behavioral contract), not *how it's currently done*
+Tests are the rewrite contract. Every test should encode _what must
+be true_ (the behavioral contract), not _how it's currently done_
 (the implementation). A test that would break if you rewrote the
 module in Rust with the same interface is testing plumbing, not theory.
 
 Rules:
+
 - Test the contract, not the implementation
 - Tests should survive a language rewrite unchanged in logic
 - Prefer integration-style tests over unit tests of private helpers
